@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from pathlib import Path
 from typing import Any
 
@@ -11,14 +12,18 @@ _model_lock = asyncio.Lock()
 
 
 def _build_model(cache_folder: Path, device: str) -> Any:
-    from tribev2 import TribeModel
+    cache_folder = cache_folder.resolve()
+    os.environ["HOME"] = cache_folder.as_posix()
+    os.environ.setdefault("XDG_CACHE_HOME", (cache_folder / ".cache").as_posix())
+    os.environ.setdefault("HF_HOME", (cache_folder / "huggingface").as_posix())
+
+    from tribev2.demo_utils import TribeModel
 
     model = TribeModel.from_pretrained(
         "facebook/tribev2",
         cache_folder=str(cache_folder),
         device=device,
     )
-    model.eval()
     return model
 
 
