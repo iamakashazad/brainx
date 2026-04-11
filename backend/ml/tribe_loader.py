@@ -1,0 +1,55 @@
+from __future__ import annotations
+
+import asyncio
+from pathlib import Path
+from typing import Any
+
+from backend.core.config import settings
+
+_model: Any | None = None
+_model_lock = asyncio.Lock()
+
+
+def _build_model(cache_folder: Path, device: str) -> Any:
+    from tribev2 import TribeModel
+
+    model = TribeModel.from_pretrained(
+        "facebook/tribev2",
+        cache_folder=str(cache_folder),
+        device=device,
+    )
+    model.eval()
+    return model
+
+
+async def load_model(cache_folder: str | Path | None = None, device: str | None = None) -> Any:
+    global _model
+
+    if _model is not None:
+        return _model
+
+    async with _model_lock:
+        if _model is not None:
+            return _model
+
+        resolved_cache = Path(cache_folder or settings.model_cache_path).expanduser()
+        resolved_cache.mkdir(parents=True, exist_ok=True)
+
+        loop = asyncio.get_running_loop()
+        _model = await loop.run_in_executor(
+            None,
+            _build_model,
+            resolved_cache,
+            device or settings.device,
+        )
+        return _model
+
+
+def get_model() -> Any:
+    if _model is None:
+        raise RuntimeError("Model not loaded")
+    return _model
+
+
+def is_model_loaded() -> bool:
+    return _model is not None
