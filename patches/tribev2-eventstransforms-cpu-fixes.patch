@@ -1,0 +1,59 @@
+This patch documents changes applied to the local tribev2 installation at
+tribev2/tribev2/eventstransforms.py (gitignored as a third-party library).
+The changes fix two issues that prevent TRIBEv2 text pathway from working on
+CPU with PyTorch 2.6.
+
+=== Change 1: Use base whisperx model on CPU ===
+
+Original code selected "large-v3" whisperx model unconditionally. On CPU,
+large-v3 takes >10 minutes per short audio clip, making smoke tests infeasible.
+
+Fix: Use "base" model on CPU (transcribes in seconds with native word-level
+timestamps). Use "large-v3" only on CUDA where it is fast.
+
+Also: MPS is mapped to CPU before the model selection, since TRIBEv2 stalls
+on MPS (per research in 01-RESEARCH.md).
+
+Lines changed in _get_transcript_from_audio:
+
+- device = "cuda" if torch.cuda.is_available() else "cpu"
+- whisper_model = "large-v3"
+- compute_type = "float16" if device == "cuda" else "int8"
++ device = "cuda" if torch.cuda.is_available() else "cpu"
++ # Use a smaller model on CPU for reasonable performance.
++ # large-v3 is too slow for CPU inference (>10 min per short clip).
++ # base model transcribes in seconds and is sufficient for pipeline
++ # smoke tests. MPS is excluded because TRIBEv2 stalls on MPS.
++ if device == "mps":
++     device = "cpu"
++ whisper_model = "large-v3" if device == "cuda" else "base"
++ compute_type = "float16" if device == "cuda" else "int8"
+
+=== Change 2: Skip --align_model on CPU (PyTorch 2.6 incompatibility) ===
+
+Original code always passed --align_model WAV2VEC2_ASR_LARGE_LV60K_960H to
+whisperx, triggering pyannote model loading via torch.load. PyTorch 2.6
+changed weights_only default to True, and omegaconf.listconfig.ListConfig is
+not in the safe globals allowlist, causing UnpicklingError.
+
+Fix: Only pass --align_model on CUDA + English. The base whisperx model
+produces native word-level timestamps without needing alignment.
+
+Lines changed in cmd construction:
+
+-     "--align_model",
+-     "WAV2VEC2_ASR_LARGE_LV60K_960H",
++     # On CPU, skip the pyannote alignment model (incompatible
++     # with PyTorch 2.6 weights_only=True). The base whisperx
++     # model already outputs word-level timestamps natively.
++     *(["--align_model", "WAV2VEC2_ASR_LARGE_LV60K_960H"] if device == "cuda" and language == "english" else []),
+
+=== Verification ===
+
+After applying these changes, the whisperx base model successfully transcribed
+a 4-second test audio clip to 10 word events with timestamps. The TSV cache
+at model_cache/tribev2.demo_utils.TextToEvents.get_events,0/.../audio.tsv
+confirms successful transcription.
+
+The text pathway proceeded past the transcript stage but was blocked by
+Llama-3.2-3B (gated HuggingFace model, requires HF_TOKEN + accepted terms).
