@@ -9,7 +9,7 @@ load_dotenv()
 
 
 class Settings(BaseSettings):
-    device: str = "mps"
+    device: str = "cpu"
     model_cache_path: Path = Path("./model_cache")
     database_url: str = "sqlite+aiosqlite:///./brainx.db"
 
