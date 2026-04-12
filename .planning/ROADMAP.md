@@ -30,12 +30,13 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. A `GET /model-status` and job polling endpoint (`GET /jobs/{id}`) respond correctly; the frontend can track queue position without websockets
   4. The asyncio.Queue with a single GPU worker coroutine processes one job at a time; concurrent POST requests queue without GPU OOM errors
   5. All five named circuit ROI labels (attention, cognitive load, emotional response, memory encoding, reward-related cortex) are mapped to cortical proxies only — no subcortical labels appear anywhere in the codebase
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
-- [ ] 01-01: Conda environment, Python 3.11, PyTorch 2.6 + CUDA 12.4, TRIBEv2 clone with patches (numpy pin, TemporalSmoothing)
-- [ ] 01-02: FastAPI skeleton — lifespan model loading, asyncio.Queue GPU worker, SQLite job registry, INFRA-03 polling API
-- [ ] 01-03: TRIBEv2 text pathway smoke test + video slideshow fallback (SIM-03) + differentiation gate + ROI cortical-proxy label schema
+- [x] 01-01: Conda environment, Python 3.11, PyTorch 2.6 + CUDA 12.4, TRIBEv2 clone with patches (numpy pin, TemporalSmoothing)
+- [x] 01-02: FastAPI skeleton — lifespan model loading, asyncio.Queue GPU worker, SQLite job registry, INFRA-03 polling API
+- [x] 01-03: TRIBEv2 text pathway smoke test + video slideshow fallback (SIM-03) + differentiation gate + ROI cortical-proxy label schema
+- [ ] 01-04-PLAN.md — Gap closure: fix MPS inference stall (CPU fallback), run live TRIBEv2 integration tests, validate differentiation gate
 
 ### Phase 2: Simulation Pipeline and Content Input
 **Goal**: Users can define a persona, upload or paste content, and receive a validated simulation log — the structured session narrative that becomes TRIBEv2 input
@@ -113,7 +114,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation and TRIBEv2 Integration | 0/3 | Not started | - |
+| 1. Foundation and TRIBEv2 Integration | 3/4 | In progress | - |
 | 2. Simulation Pipeline and Content Input | 0/4 | Not started | - |
 | 3. Full Pipeline Integration and Recommendations | 0/3 | Not started | - |
 | 4. Frontend — Upload, Persona, and Results | 0/3 | Not started | - |
