@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 from pathlib import Path
 from typing import Any
 
 from backend.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 _model: Any | None = None
 _model_lock = asyncio.Lock()
@@ -16,6 +19,22 @@ def _build_model(cache_folder: Path, device: str) -> Any:
     os.environ["HOME"] = cache_folder.as_posix()
     os.environ.setdefault("XDG_CACHE_HOME", (cache_folder / ".cache").as_posix())
     os.environ.setdefault("HF_HOME", (cache_folder / "huggingface").as_posix())
+
+    # Validate device — fall back to CPU if MPS requested but unreliable
+    if device == "mps":
+        import torch
+
+        if torch.backends.mps.is_available():
+            logger.warning(
+                "MPS available but TRIBEv2 inference stalls on MPS — falling back to CPU"
+            )
+        device = "cpu"
+    elif device == "cuda":
+        import torch
+
+        if not torch.cuda.is_available():
+            logger.warning("CUDA requested but not available — falling back to CPU")
+            device = "cpu"
 
     from tribev2.demo_utils import TribeModel
 
