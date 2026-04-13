@@ -20,6 +20,11 @@ def _build_model(cache_folder: Path, device: str) -> Any:
     os.environ.setdefault("XDG_CACHE_HOME", (cache_folder / ".cache").as_posix())
     os.environ.setdefault("HF_HOME", (cache_folder / "huggingface").as_posix())
 
+    hf_token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
+    if hf_token:
+        os.environ.setdefault("HF_TOKEN", hf_token)
+        os.environ.setdefault("HUGGING_FACE_HUB_TOKEN", hf_token)
+
     # Validate device — fall back to CPU if MPS requested but unreliable
     if device == "mps":
         import torch
@@ -36,12 +41,37 @@ def _build_model(cache_folder: Path, device: str) -> Any:
             logger.warning("CUDA requested but not available — falling back to CPU")
             device = "cpu"
 
+    # Local VJEPA2 weights are staged into the HF hub cache layout at
+    # model_cache/huggingface/hub/models--facebook--vjepa2-vitg-fpc64-256/ so that
+    # AutoModel.from_pretrained("facebook/vjepa2-vitg-fpc64-256") resolves offline.
+    local_vjepa_cache = (
+        cache_folder
+        / "huggingface"
+        / "hub"
+        / "models--facebook--vjepa2-vitg-fpc64-256"
+    )
+    if (local_vjepa_cache / "refs" / "main").exists():
+        logger.info("VJEPA2 hub cache present at %s", local_vjepa_cache)
+
     from tribev2.demo_utils import TribeModel
+
+    # The pretrained config.yaml hardcodes `device: cuda` on all four feature
+    # extractors (text, image, audio, video). On CPU-only machines this causes
+    # `neuralset.extractors.video.py` to call `.to("cuda")` during prepare(),
+    # crashing with "Torch not compiled with CUDA enabled". Override them.
+    extractor_device = device
+    config_update = {
+        "data.text_feature.device": extractor_device,
+        "data.image_feature.image.device": extractor_device,
+        "data.audio_feature.device": extractor_device,
+        "data.video_feature.image.device": extractor_device,
+    }
 
     model = TribeModel.from_pretrained(
         "facebook/tribev2",
         cache_folder=str(cache_folder),
         device=device,
+        config_update=config_update,
     )
     return model
 
