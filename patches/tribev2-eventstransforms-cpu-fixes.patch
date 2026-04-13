@@ -48,12 +48,33 @@ Lines changed in cmd construction:
 +     # model already outputs word-level timestamps natively.
 +     *(["--align_model", "WAV2VEC2_ASR_LARGE_LV60K_960H"] if device == "cuda" and language == "english" else []),
 
+=== Change 3: Use silero VAD on CPU (PyTorch 2.6 incompatibility) ===
+
+Even with --align_model removed, whisperx still loads the pyannote VAD
+checkpoint unconditionally. That checkpoint pickles an
+omegaconf.listconfig.ListConfig, which PyTorch 2.6's weights_only=True
+rejects with the same UnpicklingError as the alignment model.
+
+Fix: Pass --vad_method silero on non-CUDA devices. Silero VAD ships as a
+plain torch.jit archive and does not trigger the weights_only allowlist.
+The installed whisperx supports --vad_method ∈ {pyannote, silero}.
+
+Lines changed in cmd construction (appended after the --align_model block):
+
++     # On non-CUDA devices, swap the default pyannote VAD for
++     # silero. Pyannote VAD also hits the PyTorch 2.6
++     # weights_only=True rejection on omegaconf.listconfig.ListConfig;
++     # silero VAD uses a plain torch.jit archive and loads cleanly.
++     *(["--vad_method", "silero"] if device != "cuda" else []),
+
 === Verification ===
 
-After applying these changes, the whisperx base model successfully transcribed
+After Changes 1 & 2, the whisperx base model successfully transcribed
 a 4-second test audio clip to 10 word events with timestamps. The TSV cache
 at model_cache/tribev2.demo_utils.TextToEvents.get_events,0/.../audio.tsv
 confirms successful transcription.
 
-The text pathway proceeded past the transcript stage but was blocked by
-Llama-3.2-3B (gated HuggingFace model, requires HF_TOKEN + accepted terms).
+Change 3 is required to get past the VAD load step before transcription
+runs. With all three changes applied, the text pathway reaches
+Llama-3.2-3B feature extraction (gated HuggingFace model, requires
+HF_TOKEN + accepted terms).
