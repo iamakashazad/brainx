@@ -25,20 +25,22 @@ key_files:
       role: Whisperx base model on CPU, --align_model removed on CPU (gitignored)
 decisions:
   - id: D-08-impl
-    summary: "DEFAULT_PATHWAY stays 'text' — differentiation test passed at unit level"
+    summary: "DEFAULT_PATHWAY = 'text' — live differentiation gate passed (mean abs diff 0.060519, max 0.321915)"
   - id: D-cpu-default
     summary: "device=cpu is the correct default for this machine; mps causes TRIBEv2 stalls"
+  - id: D-vad-silero
+    summary: "Use --vad_method silero on non-CUDA devices; pyannote VAD hits the same PyTorch 2.6 weights_only=True rejection as the alignment model"
 metrics:
   duration_minutes: 40
   tasks_completed: 2
   tasks_total: 2
   files_changed: 5
-  completed_date: "2026-04-12"
+  completed_date: "2026-04-13"
 ---
 
 # Phase 01 Plan 04: Fix MPS Inference Stall and Run Live Integration Tests Summary
 
-CPU device fallback implemented and committed; TRIBEv2 text pathway unblocked through WhisperX transcription stage; blocked by Llama-3.2-3B gated HuggingFace model (401 Unauthorized) and VJEPA2 video model download timeout.
+CPU device fallback implemented and committed. Both TRIBEv2 pathways proven end-to-end on CPU: video (commit `fd3fcc0`, ~17 min) and text (commit `5623890`, ~38 min first run / ~4 min warm). Text differentiation gate passed with clear signal separation. `DEFAULT_PATHWAY` confirmed as `text`.
 
 ## What Was Built
 
@@ -84,41 +86,29 @@ WhisperX base model successfully transcribed the test input and wrote:
 `model_cache/tribev2.demo_utils.TextToEvents.get_events,0/text=.../audio.tsv`
 Subsequent runs skip WhisperX entirely (ExtractWordsFromAudio reads cached TSV).
 
-**Test outcomes:**
+**Test outcomes (final, 2026-04-13):**
 
 | Test | Result | Notes |
 |------|--------|-------|
 | test_slideshow_creates_valid_mp4 | PASSED | Slideshow MP4 creates valid file |
 | test_pathway_auto_switch_on_failure | PASSED | Pathway config set/get works correctly |
-| test_video_pathway_produces_activation | TIMEOUT (603s) | VJEPA2 ViT-G download at 1.63GB of ~4GB, needs completion |
-| test_text_pathway_produces_activation | FAILED | Llama-3.2-3B: 401 Unauthorized (gated HF model) |
-| test_text_pathway_different_inputs_different_outputs | NOT RUN | Blocked by above |
+| test_video_pathway_produces_activation | PASSED | ~17 min on CPU; activation shape (n, >10000) confirmed (commit `fd3fcc0`) |
+| test_text_pathway_produces_activation | PASSED | 38:12 on CPU first run; activation shape asserted (commit `5623890`) |
+| test_text_pathway_different_inputs_different_outputs | PASSED | 4:04 warm-cache run; mean abs diff 0.060519, max abs diff 0.321915 |
 
-## Authentication Gates
+**Differentiation metrics (D-04 gate):**
+- Calm text: `"A serene meditation app opens with soft blue gradients. The user breathes slowly and reads each prompt in stillness."`
+- Urgent text: `"FLASH SALE ENDING NOW!!! BUY NOW!!! The user feels time pressure and rushes toward the red CTA."`
+- Mean absolute difference across TRIBEv2 activation means: **0.060519**
+- Max absolute difference: **0.321915**
+- Well above the `np.allclose(..., atol=1e-6)` tolerance → distinct activation patterns confirmed.
 
-### Gate 1 — Llama-3.2-3B (text pathway)
+## Authentication Gates (resolved)
 
-**Trigger:** `test_text_pathway_produces_activation` and `test_text_pathway_different_inputs_different_outputs`
+Both gates were resolved during Phase 01 Plan 04 completion:
 
-**Error:** `OSError: You are trying to access a gated repo. Make sure to have access to it at https://huggingface.co/meta-llama/Llama-3.2-3B. 401 Client Error.`
-
-**Required actions:**
-1. Visit https://huggingface.co/meta-llama/Llama-3.2-3B and accept the license terms
-2. Generate a HuggingFace token at https://huggingface.co/settings/tokens
-3. Set `HF_TOKEN=<your_token>` in `.env`
-4. Re-run: `RUN_TRIBEV2_INTEGRATION=1 python -m pytest tests/test_tribev2.py::TestTextPathway -v --timeout=600`
-
-### Gate 2 — VJEPA2 ViT-G model download (video pathway)
-
-**Trigger:** `test_video_pathway_produces_activation`
-
-**Status:** 1.63GB of ~4GB downloaded to `model_cache/huggingface/hub/models--facebook--vjepa2-vitg-fpc64-256/blobs/f205e77aa2ade168db6b09d4bc420d156141f64ab964278a9c181a2bdf2a232b.incomplete`
-
-**Required actions:**
-1. This is NOT an auth issue — the model is public and downloadable without authentication
-2. The download will resume automatically on the next test run
-3. Increase timeout: `RUN_TRIBEV2_INTEGRATION=1 python -m pytest tests/test_tribev2.py::TestVideoSlideshowPathway::test_video_pathway_produces_activation -v --timeout=1800`
-4. Or pre-warm: `source ~/.venvs/brainx/bin/activate && python -c "from transformers import AutoModel; AutoModel.from_pretrained('facebook/vjepa2-vitg-fpc64-256', cache_dir='./model_cache/huggingface/hub')"`
+- **Llama-3.2-3B** — `HF_TOKEN` set, license accepted, model fetched into HF hub cache during the text pathway run (first-run fetch accounted for ~23 min of the 38-min total; subsequent runs skip fetch).
+- **VJEPA2 ViT-G** — download resumed and completed; video pathway test now passes in ~17 min on CPU.
 
 ## Deviations from Plan
 
@@ -147,7 +137,9 @@ Subsequent runs skip WhisperX entirely (ExtractWordsFromAudio reads cached TSV).
 
 ## Decisions Made
 
-- **DEFAULT_PATHWAY stays "text":** The `test_pathway_auto_switch_on_failure` test passed, confirming the pathway switching mechanism works correctly. DEFAULT_PATHWAY will be updated based on live differentiation results once Llama-3.2-3B access is granted (plan acceptance criteria D-04).
+- **DEFAULT_PATHWAY = "text" (finalized 2026-04-13):** Live differentiation gate D-04 passed. Calm vs urgent text inputs produce distinct TRIBEv2 activation patterns (mean abs diff 0.060519, max 0.321915) — well above the 1e-6 tolerance. Text pathway is the default input to TRIBEv2 inference.
+
+- **`--vad_method silero` on non-CUDA (D-vad-silero):** After skipping `--align_model`, whisperx still unconditionally loaded the pyannote VAD checkpoint, which pickles `omegaconf.listconfig.ListConfig` and trips PyTorch 2.6's `weights_only=True` allowlist. Swapping to silero VAD (plain torch.jit archive) resolved the last CPU blocker on the text pathway.
 
 - **device=cpu is the correct non-negotiable default for this machine:** Apple M-series MPS causes TRIBEv2 stalls. CPU is slow but correct. VJEPA2 and TRIBEv2 checkpoint loading both confirmed to work on CPU once models are downloaded.
 
@@ -159,12 +151,12 @@ None — no stub values were introduced. The `DEFAULT_PATHWAY: str = "text"` is 
 
 | Criterion | Status | Notes |
 |-----------|--------|-------|
-| TRIBEv2 inference completes on CPU without hanging | PARTIAL | MPS fix committed; inference blocked at Llama-3.2-3B download (not hanging, erroring) |
-| test_text_pathway_produces_activation passes with shape[1] > 10000 | BLOCKED | Requires HF_TOKEN + Llama-3.2-3B access |
-| test_text_pathway_different_inputs_different_outputs passes | BLOCKED | Same gate |
-| test_video_pathway_produces_activation passes with shape[1] > 10000 | BLOCKED | VJEPA2 download incomplete (1.63/~4GB); resume and run with longer timeout |
-| All 5 integration tests pass when RUN_TRIBEV2_INTEGRATION=1 | 2/5 PASSED | Gates above block remaining 3 |
-| ROADMAP SC #1 and SC #2 are fully satisfied | PENDING | Gates above |
+| TRIBEv2 inference completes on CPU without hanging | PASSED | Video path ~17min, text path ~38min first run / ~4min warm |
+| test_text_pathway_produces_activation passes with shape[1] > 10000 | PASSED | 38:12, activation shape asserted (commit 5623890) |
+| test_text_pathway_different_inputs_different_outputs passes | PASSED | 4:04 warm, mean abs diff 0.060519 |
+| test_video_pathway_produces_activation passes with shape[1] > 10000 | PASSED | 17min on CPU (commit fd3fcc0) |
+| All 5 integration tests pass when RUN_TRIBEV2_INTEGRATION=1 | 5/5 PASSED | All pathways + pathway-switch + slideshow green |
+| ROADMAP SC #1 and SC #2 are fully satisfied | SATISFIED | Video + text activations verified; differentiation confirmed |
 
 ## Commits
 
@@ -172,6 +164,8 @@ None — no stub values were introduced. The `DEFAULT_PATHWAY: str = "text"` is 
 |------|-------------|------|
 | fa6fccb | fix(01-04): change default device to CPU and add MPS fallback logic | Task 1 |
 | 6c237ea | feat(01-04): document CPU fixes for tribev2 eventstransforms and test outcomes | Task 2 |
+| fd3fcc0 | fix(01-04): unblock video pathway on CPU — override CUDA config, handle numpy preds | Task 3 (video) |
+| 5623890 | fix(01-04): unblock text pathway on CPU — silero VAD swap | Task 3 (text) |
 
 ## Self-Check: PASSED
 
