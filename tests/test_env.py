@@ -14,7 +14,7 @@ def test_python_version() -> None:
 
 
 def test_settings_defaults() -> None:
-    assert settings.device == "mps"
+    assert settings.device == "cpu"
     assert settings.model_cache_path.as_posix() == "model_cache"
     assert settings.database_url == "sqlite+aiosqlite:///./brainx.db"
 
