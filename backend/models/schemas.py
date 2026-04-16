@@ -4,6 +4,13 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
+from backend.models.persona import (
+    CognitiveStateModel,
+    DemographicsModel,
+    EnvironmentModel,
+    PsychographicsModel,
+)
+
 
 class TestInferenceRequest(BaseModel):
     text: str = Field(..., min_length=1)
@@ -29,4 +36,50 @@ class JobStatusResponse(BaseModel):
 class ModelStatusResponse(BaseModel):
     loaded: bool
     device: str
+    status: str
+
+
+class PersonaCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    demographics: DemographicsModel
+    psychographics: PsychographicsModel
+    cognitive_state: CognitiveStateModel
+    environment: EnvironmentModel
+
+
+class PersonaUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1, max_length=120)
+    demographics: Optional[DemographicsModel] = None
+    psychographics: Optional[PsychographicsModel] = None
+    cognitive_state: Optional[CognitiveStateModel] = None
+    environment: Optional[EnvironmentModel] = None
+
+
+class PersonaRead(BaseModel):
+    id: str
+    name: str
+    demographics: DemographicsModel
+    psychographics: PsychographicsModel
+    cognitive_state: CognitiveStateModel
+    environment: EnvironmentModel
+    created_at: str
+    updated_at: str
+
+
+class TextContentRequest(BaseModel):
+    content_text: str = Field(min_length=1, max_length=20000)
+
+
+class ContentCreated(BaseModel):
+    content_id: str
+    content_type: str
+
+
+class AnalyzeRequest(BaseModel):
+    persona_id: str = Field(min_length=1)
+    content_id: str = Field(min_length=1)
+
+
+class AnalyzeResponse(BaseModel):
+    job_id: str
     status: str

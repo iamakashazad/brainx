@@ -51,10 +51,10 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 02-01: Persona builder API — CRUD endpoints, SQLite persistence, save/reuse (PERS-01, PERS-02, PERS-03, PERS-04)
-- [ ] 02-02: Content upload API — multipart image upload (1–5 screens), static content, text paste; image resize + JPEG compression pipeline (CONT-01, CONT-02, CONT-03)
-- [ ] 02-03: DeepSeek simulation service — structured output schema, hallucination validation pass, screen-grounding prompts (SIM-01, SIM-04)
-- [ ] 02-04: Scroll/hesitation map overlay derivation from simulation log + stage-level job status transitions (SIM-02)
+- [x] 02-01: Persona builder API — CRUD endpoints, SQLite persistence, save/reuse (PERS-01, PERS-02, PERS-03, PERS-04)
+- [x] 02-02: Content upload API — multipart image upload (1–5 screens), static content, text paste; image resize + JPEG compression pipeline (CONT-01, CONT-02, CONT-03)
+- [x] 02-03: DeepSeek simulation service — structured output schema, hallucination validation pass, screen-grounding prompts (SIM-01, SIM-04)
+- [x] 02-04: Scroll/hesitation map overlay derivation from simulation log + stage-level job status transitions (SIM-02)
 
 ### Phase 3: Full Pipeline Integration and Recommendations Engine
 **Goal**: A complete analysis run — from content upload and persona selection through to five-circuit brain maps and specific copy recommendations — executes end-to-end and produces results grounded in ROI activation data

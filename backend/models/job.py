@@ -1,14 +1,22 @@
 from __future__ import annotations
 
 import datetime as dt
+import enum
 import uuid
 
-from sqlalchemy import Column, DateTime, Integer, JSON, String
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, JSON, String
 from sqlalchemy.orm import DeclarativeBase
 
 
 class Base(DeclarativeBase):
     pass
+
+
+class StageEnum(str, enum.Enum):
+    SIMULATION = "simulation"
+    GROUNDING_CHECK = "grounding_check"
+    INFERENCE = "inference"
+    PROCESSING = "processing"
 
 
 class Job(Base):
@@ -30,3 +38,5 @@ class Job(Base):
     retry_count = Column(Integer, default=0)
     input_path = Column(String, nullable=True)
     input_type = Column(String, nullable=True)
+    persona_id = Column(String, ForeignKey("personas.id"), nullable=True)
+    content_id = Column(String, ForeignKey("contents.id"), nullable=True)

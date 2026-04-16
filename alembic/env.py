@@ -6,6 +6,8 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 from backend.models.job import Base
+from backend.models import content as _content  # noqa: F401
+from backend.models import persona as _persona  # noqa: F401
 
 config = context.config
 
