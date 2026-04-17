@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import logging
+import re
 import uuid
+from pathlib import Path
 
 import pytest
 from sqlalchemy import select
@@ -39,3 +41,32 @@ async def test_transition_writes(tmp_path, caplog):
     assert any("simulation" in record.message for record in caplog.records)
 
     await engine.dispose()
+
+
+def test_stage_enum_order() -> None:
+    assert list(StageEnum) == [
+        StageEnum.SIMULATION,
+        StageEnum.GROUNDING_CHECK,
+        StageEnum.INFERENCE,
+        StageEnum.ROI_AGGREGATION,
+        StageEnum.PROCESSING,
+        StageEnum.RECOMMENDATIONS,
+    ]
+
+
+def test_stage_enum_values() -> None:
+    assert [stage.value for stage in StageEnum] == [
+        "simulation",
+        "grounding_check",
+        "inference",
+        "roi_aggregation",
+        "processing",
+        "recommendations",
+    ]
+
+
+def test_no_inline_stage_writes() -> None:
+    src = Path("backend/core/queue.py").read_text()
+    assert not re.search(r"\bjob\.stage\s*=\s*['\"]", src), (
+        "queue.py contains inline job.stage string assignment — use transition() per D-22"
+    )

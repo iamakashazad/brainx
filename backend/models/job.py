@@ -16,7 +16,9 @@ class StageEnum(str, enum.Enum):
     SIMULATION = "simulation"
     GROUNDING_CHECK = "grounding_check"
     INFERENCE = "inference"
+    ROI_AGGREGATION = "roi_aggregation"
     PROCESSING = "processing"
+    RECOMMENDATIONS = "recommendations"
 
 
 class Job(Base):
