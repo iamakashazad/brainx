@@ -26,6 +26,7 @@ from backend.main import create_app  # noqa: E402
 from backend.models.job import Base  # noqa: E402
 from backend.models import content as _content  # noqa: E402,F401
 from backend.models import persona as _persona  # noqa: E402,F401
+from backend.models.recommendations import Recommendations  # noqa: E402
 from backend.models.schemas import PersonaRead  # noqa: E402
 
 
@@ -50,9 +51,31 @@ async def client(tmp_path, monkeypatch) -> AsyncClient:
     async def fake_video_inference(_path: str) -> np.ndarray:
         return np.zeros((2, 8))
 
+    async def fake_generate_recommendations(*_args, **_kwargs) -> Recommendations:
+        return Recommendations.model_validate(
+            {
+                "recommendations": [
+                    {
+                        "rec_type": "copy_rewrite",
+                        "screen_index": 0,
+                        "evidence": {
+                            "circuit": "Attention",
+                            "region": "S_front_inf",
+                            "activation_score": 50.0,
+                            "score_rank": "Moderate",
+                        },
+                        "before": "old",
+                        "after": "new",
+                        "rationale": "Attention is moderate; shorter copy helps.",
+                    }
+                ]
+            }
+        )
+
     monkeypatch.setattr("backend.main.load_model", fake_load_model)
     monkeypatch.setattr(queue_manager, "run_tribev2_text", fake_text_inference)
     monkeypatch.setattr(queue_manager, "run_tribev2_video", fake_video_inference)
+    monkeypatch.setattr(queue_manager, "generate_recommendations", fake_generate_recommendations)
 
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

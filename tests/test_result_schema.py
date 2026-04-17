@@ -257,7 +257,10 @@ class TestResultEnvelope:
         )
         final = await _wait_for_terminal(client, response.json()["job_id"])
 
-        assert final["result"]["recommendations"] == []
+        recommendations = final["result"]["recommendations"]
+        assert isinstance(recommendations, list)
+        assert recommendations
+        assert recommendations[0]["evidence"]["circuit"] == "Attention"
 
     async def test_stage_progression_caplog(
         self,

@@ -9,13 +9,15 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.core import database
+from backend.models.recommendations import Recommendations
 from backend.models.results import AnalysisResult, SCHEMA_VERSION
 from backend.models.content import Content
 from backend.models.job import Job, StageEnum
 from backend.models.persona import Persona
-from backend.models.simulation import HallucinationError, SchemaValidationFailure
+from backend.models.simulation import DeepSeekClientError, HallucinationError, SchemaValidationFailure
 from backend.services.continuity import compute_flow_continuity
 from backend.services import grounding, simulation
+from backend.services.recommendations import generate_recommendations
 from backend.services.inference import run_tribev2_text, run_tribev2_video
 from backend.services.overlay import derive_overlays
 from backend.services.roi_aggregation import (
@@ -195,7 +197,15 @@ async def _process_job(job_id: str) -> None:
             job = (await session.execute(select(Job).where(Job.id == job_id))).scalar_one()
             await transition(session, job, StageEnum.RECOMMENDATIONS)
 
-        recommendations_dump: list[dict[str, object]] = []
+        recs_result: Recommendations = await generate_recommendations(
+            persona=persona,
+            sim_log=sim_log,
+            roi_per_screen=roi_per_screen,
+            flow_continuity=flow_continuity,
+        )
+        recommendations_dump: list[dict[str, object]] = [
+            recommendation.model_dump() for recommendation in recs_result.recommendations
+        ]
         envelope = AnalysisResult(
             schema_version=SCHEMA_VERSION,
             simulation=sim_log.model_dump(),

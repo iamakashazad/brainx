@@ -204,6 +204,8 @@ async def test_happy_path(client, persona_fixture, text_content_fixture, monkeyp
 
     assert final["status"] == "DONE", final
     assert final["result"]["simulation"]["screens"][0]["narrative_text"] == "user reads ad"
+    assert len(final["result"]["recommendations"]) == 1
+    assert final["result"]["recommendations"][0]["evidence"]["circuit"] == "Attention"
 
 
 async def test_bad_persona(client, text_content_fixture):
@@ -430,6 +432,59 @@ async def test_activations_manifest_shape(
         assert entry["screen_index"] == index
         assert entry["shape"] == [2, 20484]
         assert entry["timesteps"] == 2
+
+
+async def test_analyze_populates_recommendations_via_mock(
+    client,
+    persona_fixture,
+    ui_screens_fixture,
+    monkeypatch,
+    sim_log_3_screens,
+):
+    from backend.models.recommendations import Recommendations
+
+    async def fake_simulate(_persona, _content):
+        return sim_log_3_screens
+
+    async def fake_grounding(_content, _sim_log):
+        return None
+
+    async def fake_generate_recommendations(*_args, **_kwargs) -> Recommendations:
+        return Recommendations.model_validate(
+            {
+                "recommendations": [
+                    {
+                        "rec_type": "copy_rewrite",
+                        "screen_index": 0,
+                        "evidence": {
+                            "circuit": "Attention",
+                            "region": "S_front_inf",
+                            "activation_score": 50.0,
+                            "score_rank": "Moderate",
+                        },
+                        "before": "old",
+                        "after": "new",
+                        "rationale": "Attention is moderate; shorter copy helps.",
+                    }
+                ]
+            }
+        )
+
+    _patch_surface_text_inference(monkeypatch)
+    _patch_surface_atlas(monkeypatch)
+    monkeypatch.setattr("backend.core.queue.simulation.simulate", fake_simulate)
+    monkeypatch.setattr("backend.core.queue.grounding.judge", fake_grounding)
+    monkeypatch.setattr("backend.core.queue.generate_recommendations", fake_generate_recommendations)
+
+    response = await client.post(
+        "/analyze",
+        json={"persona_id": persona_fixture, "content_id": ui_screens_fixture},
+    )
+    final = await _wait_for_terminal(client, response.json()["job_id"])
+
+    assert final["status"] == "DONE", final
+    assert len(final["result"]["recommendations"]) == 1
+    assert final["result"]["recommendations"][0]["evidence"]["circuit"] == "Attention"
 
 
 async def test_legacy_test_inference_single_shot(client, monkeypatch, tmp_path):
