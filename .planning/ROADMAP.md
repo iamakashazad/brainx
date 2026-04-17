@@ -66,12 +66,14 @@ Plans:
   3. Every copy rewrite recommendation cites the specific brain region and activation score driving it — a blind evaluation with two opposite activation profiles produces demonstrably different, score-citing recommendations
   4. Layout elements triggering cognitive overload or failing to activate reward-related cortex are flagged with specific identifiers; screens predicted to be remembered vs. forgotten are labeled; emotional drop-off points have suggested fixes
   5. The full `POST /analyze` → queue → simulation → inference → ROI aggregation → recommendations → `DONE` lifecycle completes and stores the structured result in SQLite with vertex arrays on disk
-**Plans**: TBD
+**Plans**: 5 plans
 
 Plans:
-- [ ] 03-01-PLAN.md — Per-screen TRIBEv2 inference loop + nilearn fsaverage5 surface-atlas ROI aggregation (D-15 correctness fix, A1 vertex-count guard) (BRAIN-01, BRAIN-02)
-- [ ] 03-02-PLAN.md — Flow continuity (rising/dropping/flat/volatile trends) + schema_version:1 result_json envelope + 0–100 global rescale (BRAIN-03, BRAIN-04)
-- [ ] 03-03-PLAN.md — Recommendations engine — DeepSeek-V3 structured output with mandatory evidence field, blind-eval Jaccard < 0.4 gate with live-key fallback (REC-01, REC-02, REC-03, REC-04)
+- [x] 03-01-PLAN.md — Per-screen TRIBEv2 inference loop + nilearn fsaverage5 surface-atlas ROI aggregation (D-15 correctness fix, A1 vertex-count guard) (BRAIN-01, BRAIN-02)
+- [x] 03-02-PLAN.md — Flow continuity (rising/dropping/flat/volatile trends) + schema_version:1 result_json envelope + 0–100 global rescale (BRAIN-03, BRAIN-04)
+- [x] 03-03-PLAN.md — Recommendations engine — DeepSeek-V3 structured output with mandatory evidence field, blind-eval Jaccard < 0.4 gate with live-key fallback (REC-01, REC-02, REC-03, REC-04)
+- [ ] 03-04-PLAN.md — Gap closure: enforce and prove `layout_flag`, `memorability`, and `emotional_dropoff` behavior end-to-end
+- [ ] 03-05-PLAN.md — Gap closure: run the live `DEEPSEEK_API_KEY` blind-eval and record the pass/fail evidence
 
 ### Phase 4: Frontend — Upload, Persona, and Results
 **Goal**: Users can submit an analysis through a complete React web UI and view brain activation maps alongside grounded recommendations in a single results panel
