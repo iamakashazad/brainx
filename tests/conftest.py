@@ -24,6 +24,7 @@ from backend.main import create_app  # noqa: E402
 from backend.models.job import Base  # noqa: E402
 from backend.models import content as _content  # noqa: E402,F401
 from backend.models import persona as _persona  # noqa: E402,F401
+from backend.models.schemas import PersonaRead  # noqa: E402
 
 
 @pytest_asyncio.fixture
@@ -109,6 +110,14 @@ async def persona_fixture(client: AsyncClient) -> str:
     response = await client.post("/personas", json=payload)
     assert response.status_code in (200, 201), response.text
     return response.json()["id"]
+
+
+@pytest_asyncio.fixture
+async def persona_model_fixture(client: AsyncClient, persona_fixture: str) -> PersonaRead:
+    """Return a serializable persona model for recommendation service tests."""
+    response = await client.get(f"/personas/{persona_fixture}")
+    assert response.status_code == 200, response.text
+    return PersonaRead.model_validate(response.json())
 
 
 @pytest_asyncio.fixture
