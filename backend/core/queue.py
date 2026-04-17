@@ -154,6 +154,11 @@ async def _process_job(job_id: str) -> None:
             job = (await session.execute(select(Job).where(Job.id == job_id))).scalar_one()
             await transition(session, job, StageEnum.ROI_AGGREGATION)
 
+        if per_screen_arrays:
+            logger.info(
+                "A1 probe: first-screen activation shape=%s (expected (T, 20484))",
+                per_screen_arrays[0].shape,
+            )
         atlas = get_surf_atlas()
         roi_per_screen_native: list[dict[str, object]] = []
         for screen, arr in zip(sim_log.screens, per_screen_arrays):
@@ -208,7 +213,10 @@ async def _process_job(job_id: str) -> None:
             if job is None:
                 return
             job.status = "ERROR"
-            job.error_message = str(exc)
+            message = str(exc)
+            if "fsaverage5" in message or "vertex count" in message:
+                message = f"A1 vertex-count invariant violated: {message}"
+            job.error_message = message
             await transition(session, job, None)
         return
 
