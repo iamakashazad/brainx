@@ -16,6 +16,7 @@ from backend.models.simulation import HallucinationError, SchemaValidationFailur
 from backend.services import grounding, simulation
 from backend.services.inference import run_tribev2_text, run_tribev2_video
 from backend.services.overlay import derive_overlays
+from backend.services.roi_aggregation import aggregate_screen_roi, get_surf_atlas
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +49,11 @@ async def transition(session: AsyncSession, job: Job, stage: StageEnum | None) -
     job.stage = stage.value if stage is not None else None
     logger.info("job %s -> %s", job.id, job.stage)
     await session.commit()
+
+
+def _validate_screen_narrative(screen_index: int, narrative: str) -> None:
+    if not narrative.strip():
+        raise RuntimeError(f"Empty or whitespace-only narrative on screen {screen_index}")
 
 
 async def gpu_worker_loop() -> None:
@@ -120,16 +126,52 @@ async def _process_job(job_id: str) -> None:
         async with database.async_session() as session:
             job = (await session.execute(select(Job).where(Job.id == job_id))).scalar_one()
             await transition(session, job, StageEnum.INFERENCE)
-        narrative = "\n\n".join(screen.narrative_text for screen in sim_log.screens)
-        activation = await _run_inference_with_retry(narrative)
+
+        job_act_dir = Path("activations") / job_id
+        job_act_dir.mkdir(parents=True, exist_ok=True)
+        activations_manifest: list[dict[str, str | int | list[int]]] = []
+        per_screen_arrays: list[np.ndarray] = []
+
+        for screen in sim_log.screens:
+            _validate_screen_narrative(screen.screen_index, screen.narrative_text)
+            arr = await _run_screen_inference_with_retry(
+                screen.screen_index,
+                screen.narrative_text,
+            )
+            out_path = job_act_dir / f"screen_{screen.screen_index + 1}.npy"
+            np.save(out_path, arr)
+            per_screen_arrays.append(arr)
+            activations_manifest.append(
+                {
+                    "screen_index": screen.screen_index,
+                    "path": out_path.as_posix(),
+                    "shape": list(arr.shape),
+                    "timesteps": int(arr.shape[0]),
+                }
+            )
+
+        async with database.async_session() as session:
+            job = (await session.execute(select(Job).where(Job.id == job_id))).scalar_one()
+            await transition(session, job, StageEnum.ROI_AGGREGATION)
+
+        atlas = get_surf_atlas()
+        roi_per_screen_native: list[dict[str, object]] = []
+        for screen, arr in zip(sim_log.screens, per_screen_arrays):
+            bundle = aggregate_screen_roi(arr, atlas)
+            roi_per_screen_native.append({"screen_index": screen.screen_index, **bundle})
+
+        async with database.async_session() as session:
+            job = (await session.execute(select(Job).where(Job.id == job_id))).scalar_one()
+            existing = job.result_json or {}
+            existing["activations"] = activations_manifest
+            existing["_roi_native_tmp"] = roi_per_screen_native
+            job.result_json = existing
+            await session.commit()
 
         async with database.async_session() as session:
             job = (await session.execute(select(Job).where(Job.id == job_id))).scalar_one()
             await transition(session, job, StageEnum.PROCESSING)
         overlays = derive_overlays(sim_log, content_type=content.content_type)
-        Path("activations").mkdir(exist_ok=True)
-        output_path = Path("activations") / f"{job_id}.npy"
-        np.save(output_path, activation)
 
         async with database.async_session() as session:
             job = (await session.execute(select(Job).where(Job.id == job_id))).scalar_one()
@@ -137,10 +179,6 @@ async def _process_job(job_id: str) -> None:
                 **(job.result_json or {}),
                 "simulation": sim_log.model_dump(),
                 "overlays": [overlay.model_dump() for overlay in overlays],
-                "activation": {
-                    "path": output_path.as_posix(),
-                    "shape": list(activation.shape),
-                },
             }
             job.status = "DONE"
             await transition(session, job, None)
@@ -185,6 +223,20 @@ async def _run_inference_with_retry(text_content: str) -> np.ndarray:
             if attempt == 0:
                 continue
             raise RuntimeError(f"Inference failed after 2 attempts: {last_error}") from exc
+
+
+async def _run_screen_inference_with_retry(screen_index: int, narrative: str) -> np.ndarray:
+    last_error = "unknown error"
+    for attempt in range(2):
+        try:
+            return await run_tribev2_text(narrative)
+        except Exception as exc:
+            last_error = str(exc)
+            if attempt == 0:
+                continue
+            raise RuntimeError(
+                f"Inference failed for screen {screen_index} after 2 attempts: {last_error}"
+            ) from exc
 
 
 async def _run_inference_only(job_id: str, input_type: str, input_payload: str) -> None:

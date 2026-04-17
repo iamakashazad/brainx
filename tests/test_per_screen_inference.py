@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from backend.core.queue import _run_screen_inference_with_retry
+from backend.core.queue import _run_screen_inference_with_retry, _validate_screen_narrative
 
 
 class TestRunScreenInferenceWithRetry:
@@ -53,7 +53,6 @@ class TestRunScreenInferenceWithRetry:
 
 
 class TestActivationsFilesystem:
-    @pytest.mark.xfail(reason="analyze-branch wiring lands in 03-01 task 3")
     def test_per_screen_paths_use_1_indexed_names(self) -> None:
         job_id = "job-123"
         expected = [
@@ -67,7 +66,6 @@ class TestActivationsFilesystem:
 
 
 class TestEmptyNarrativeGuard:
-    @pytest.mark.xfail(reason="analyze-branch wiring lands in 03-01 task 3")
-    @pytest.mark.asyncio
-    async def test_empty_narrative_raises_with_screen_index(self) -> None:
-        raise RuntimeError("screen 2 narrative is empty")
+    def test_empty_narrative_raises_with_screen_index(self) -> None:
+        with pytest.raises(RuntimeError, match="screen 1"):
+            _validate_screen_narrative(1, "   ")

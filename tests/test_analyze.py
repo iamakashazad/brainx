@@ -6,12 +6,14 @@ import time
 from unittest.mock import AsyncMock, patch
 
 import httpx
+import numpy as np
 import pytest
 import respx
 from sqlalchemy import select
 
 from backend.core import database
 from backend.models.job import Job
+from tests.fixtures.sim_log_3_screens import empty_narrative_screen, sim_log_3_screens
 
 pytestmark = pytest.mark.asyncio
 
@@ -52,6 +54,114 @@ BAD_JUDGE = json.dumps(
 )
 
 
+THREE_SCREEN_SIM_JSON = json.dumps(
+    {
+        "screens": [
+            {
+                "screen_index": 0,
+                "narrative_text": "User opens the welcome screen calmly, reading the headline with focus.",
+                "summary_emotional_state": "calm",
+                "memorability_hypothesis": "Likely remembered because it frames the first impression.",
+                "events": [
+                    {
+                        "timestamp_ms": 100,
+                        "type": "fixation",
+                        "target_region": {
+                            "x_ratio": 0.1,
+                            "y_ratio": 0.1,
+                            "width_ratio": 0.8,
+                            "height_ratio": 0.2,
+                        },
+                        "intensity": 0.6,
+                        "note": "Headline fixation",
+                    }
+                ],
+            },
+            {
+                "screen_index": 1,
+                "narrative_text": "User scrolls through a dense feature list and feels overwhelmed by the options shown.",
+                "summary_emotional_state": "frustrated",
+                "memorability_hypothesis": "Likely forgotten because the screen is too dense.",
+                "events": [
+                    {
+                        "timestamp_ms": 2000,
+                        "type": "scroll",
+                        "target_region": {
+                            "x_ratio": 0.0,
+                            "y_ratio": 0.5,
+                            "width_ratio": 1.0,
+                            "height_ratio": 0.4,
+                        },
+                        "intensity": 0.8,
+                        "note": "Fast scroll past features",
+                    }
+                ],
+            },
+            {
+                "screen_index": 2,
+                "narrative_text": "User reaches the CTA button and feels excited to sign up immediately after scanning pricing.",
+                "summary_emotional_state": "excited",
+                "memorability_hypothesis": "Strongly remembered because the CTA creates reward anticipation.",
+                "events": [
+                    {
+                        "timestamp_ms": 4000,
+                        "type": "click_intent",
+                        "target_region": {
+                            "x_ratio": 0.3,
+                            "y_ratio": 0.8,
+                            "width_ratio": 0.4,
+                            "height_ratio": 0.1,
+                        },
+                        "intensity": 0.9,
+                        "note": "Sign up CTA",
+                    }
+                ],
+            },
+        ]
+    }
+)
+
+
+def _patch_surface_text_inference(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    delay: float = 0.0,
+) -> None:
+    async def fake_text_inference(_text: str) -> np.ndarray:
+        if delay:
+            await asyncio.sleep(delay)
+        return np.ones((2, 20484))
+
+    monkeypatch.setattr("backend.core.queue.run_tribev2_text", fake_text_inference)
+
+
+def _patch_surface_atlas(monkeypatch: pytest.MonkeyPatch) -> None:
+    labels = ["Unknown"] + [
+        "S_front_inf",
+        "G_front_inf-Triangul",
+        "S_intrapariet_and_P_trans",
+        "G_front_middle",
+        "S_front_middle",
+        "G_front_sup",
+        "G_insular_short",
+        "S_cingul-Marginalis",
+        "G_cingul-Post-ventral",
+        "G_oc-temp_med-Parahip",
+        "S_collat_transv_ant",
+        "G_orbital",
+        "G_rectus",
+        "S_orbital-H_Shaped",
+    ]
+    labels.extend(f"Unused_{index}" for index in range(76 - len(labels)))
+    bilateral = np.resize(np.arange(1, 15, dtype=np.int64), 20484)
+    atlas = {
+        "map_left": bilateral[:10242],
+        "map_right": bilateral[10242:],
+        "labels": labels,
+    }
+    monkeypatch.setattr("backend.core.queue.get_surf_atlas", lambda: atlas)
+
+
 async def _wait_for_terminal(client, job_id: str, max_iters: int = 60):
     body = {}
     for _ in range(max_iters):
@@ -67,6 +177,8 @@ async def test_happy_path(client, persona_fixture, text_content_fixture, monkeyp
     from backend.core.config import settings
 
     monkeypatch.setattr(settings, "deepseek_api_key", "deepseek-test")
+    _patch_surface_text_inference(monkeypatch)
+    _patch_surface_atlas(monkeypatch)
     with respx.mock(assert_all_called=False) as router:
         router.post("https://api.deepseek.com/chat/completions").mock(
             return_value=httpx.Response(200, json={"choices": [{"message": {"content": VALID_SIM_JSON}}]})
@@ -116,15 +228,12 @@ async def test_stage_transitions(client, persona_fixture, text_content_fixture, 
     monkeypatch.setattr(settings, "deepseek_api_key", "deepseek-test")
     original_simulate = simulation_service.simulate
 
-    async def slow_text_inference(_text: str):
-        await asyncio.sleep(0.05)
-        return __import__("numpy").ones((2, 8))
-
     async def slow_simulate(persona, content):
         await asyncio.sleep(0.05)
         return await original_simulate(persona, content)
 
-    monkeypatch.setattr("backend.core.queue.run_tribev2_text", slow_text_inference)
+    _patch_surface_text_inference(monkeypatch, delay=0.05)
+    _patch_surface_atlas(monkeypatch)
     monkeypatch.setattr("backend.core.queue.simulation.simulate", slow_simulate)
     seen_stages: set[str] = set()
 
@@ -151,13 +260,17 @@ async def test_stage_transitions(client, persona_fixture, text_content_fixture, 
 
     assert final["status"] == "DONE", final
     assert "simulation" in seen_stages
-    assert any(stage in seen_stages for stage in {"inference", "processing"})
+    assert "inference" in seen_stages
+    assert "_roi_native_tmp" in final["result"]
+    assert "activations" in final["result"]
 
 
 async def test_failure_policy_simulation_retry(client, persona_fixture, text_content_fixture, monkeypatch):
     from backend.core.config import settings
 
     monkeypatch.setattr(settings, "deepseek_api_key", "deepseek-test")
+    _patch_surface_text_inference(monkeypatch)
+    _patch_surface_atlas(monkeypatch)
     call_count = {"count": 0}
 
     def responder(_request: httpx.Request) -> httpx.Response:
@@ -208,6 +321,8 @@ async def test_failure_policy_processing_fail_hard(
     from backend.core.config import settings
 
     monkeypatch.setattr(settings, "deepseek_api_key", "deepseek-test")
+    _patch_surface_text_inference(monkeypatch)
+    _patch_surface_atlas(monkeypatch)
 
     def boom(*_args, **_kwargs):
         raise RuntimeError("processing exploded")
@@ -226,3 +341,113 @@ async def test_failure_policy_processing_fail_hard(
 
     assert final["status"] == "ERROR"
     assert "processing exploded" in final["error"]
+
+
+async def test_per_screen_files_written(
+    client,
+    persona_fixture,
+    ui_screens_fixture,
+    monkeypatch,
+    tmp_path,
+    sim_log_3_screens,
+):
+    async def fake_simulate(_persona, _content):
+        return sim_log_3_screens
+
+    async def fake_grounding(_content, _sim_log):
+        return None
+
+    monkeypatch.chdir(tmp_path)
+    _patch_surface_text_inference(monkeypatch)
+    _patch_surface_atlas(monkeypatch)
+    monkeypatch.setattr("backend.core.queue.simulation.simulate", fake_simulate)
+    monkeypatch.setattr("backend.core.queue.grounding.judge", fake_grounding)
+
+    response = await client.post(
+        "/analyze",
+        json={"persona_id": persona_fixture, "content_id": ui_screens_fixture},
+    )
+    final = await _wait_for_terminal(client, response.json()["job_id"])
+
+    assert final["status"] == "DONE", final
+    job_dir = tmp_path / "activations" / response.json()["job_id"]
+    assert (job_dir / "screen_1.npy").exists()
+    assert (job_dir / "screen_2.npy").exists()
+    assert (job_dir / "screen_3.npy").exists()
+    assert not (job_dir / "screen_4.npy").exists()
+
+
+async def test_empty_narrative_errors(
+    client,
+    persona_fixture,
+    ui_screens_fixture,
+    monkeypatch,
+    empty_narrative_screen,
+):
+    async def fake_simulate(_persona, _content):
+        return empty_narrative_screen
+
+    async def fake_grounding(_content, _sim_log):
+        return None
+
+    _patch_surface_text_inference(monkeypatch)
+    _patch_surface_atlas(monkeypatch)
+    monkeypatch.setattr("backend.core.queue.simulation.simulate", fake_simulate)
+    monkeypatch.setattr("backend.core.queue.grounding.judge", fake_grounding)
+
+    response = await client.post(
+        "/analyze",
+        json={"persona_id": persona_fixture, "content_id": ui_screens_fixture},
+    )
+    final = await _wait_for_terminal(client, response.json()["job_id"])
+
+    assert final["status"] == "ERROR"
+    assert "screen 1" in final["error"]
+
+
+async def test_activations_manifest_shape(
+    client,
+    persona_fixture,
+    ui_screens_fixture,
+    monkeypatch,
+    sim_log_3_screens,
+):
+    async def fake_simulate(_persona, _content):
+        return sim_log_3_screens
+
+    async def fake_grounding(_content, _sim_log):
+        return None
+
+    _patch_surface_text_inference(monkeypatch)
+    _patch_surface_atlas(monkeypatch)
+    monkeypatch.setattr("backend.core.queue.simulation.simulate", fake_simulate)
+    monkeypatch.setattr("backend.core.queue.grounding.judge", fake_grounding)
+
+    response = await client.post(
+        "/analyze",
+        json={"persona_id": persona_fixture, "content_id": ui_screens_fixture},
+    )
+    final = await _wait_for_terminal(client, response.json()["job_id"])
+
+    assert final["status"] == "DONE", final
+    manifest = final["result"]["activations"]
+    assert len(manifest) == 3
+    for index, entry in enumerate(manifest):
+        assert set(entry.keys()) >= {"screen_index", "path", "shape", "timesteps"}
+        assert entry["screen_index"] == index
+        assert entry["shape"] == [2, 20484]
+        assert entry["timesteps"] == 2
+
+
+async def test_legacy_test_inference_single_shot(client, monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+
+    response = await client.post("/test-inference", json={"text": "hello world", "input_type": "text"})
+    assert response.status_code == 200
+
+    final = await _wait_for_terminal(client, response.json()["job_id"])
+
+    assert final["status"] == "DONE", final
+    assert final["result"]["shape"] == [2, 8]
+    assert (tmp_path / "activations" / f"{response.json()['job_id']}.npy").exists()
+    assert not (tmp_path / "activations" / response.json()["job_id"] / "screen_2.npy").exists()
