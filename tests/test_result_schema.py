@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 
@@ -56,11 +57,12 @@ async def _wait_for_terminal(client, job_id: str, max_iters: int = 60) -> dict:
         body = response.json()
         if body["status"] in {"DONE", "ERROR"}:
             return body
+        await asyncio.sleep(0.05)
     raise AssertionError(f"job {job_id} did not complete: {body}")
 
 
 class TestResultEnvelope:
-    async def test_result_json_envelope_keys(
+    async def test_envelope_keys(
         self,
         client,
         persona_fixture,
@@ -118,7 +120,7 @@ class TestResultEnvelope:
         assert model.schema_version == 1
         assert AnalysisResult.model_validate(model.model_dump()).schema_version == 1
 
-    async def test_per_screen_roi_shape(
+    async def test_roi_per_screen_has_both_circuits_and_regions(
         self,
         client,
         persona_fixture,
@@ -159,7 +161,41 @@ class TestResultEnvelope:
                 assert 0.0 <= row["score"] <= 100.0
                 assert 0.0 <= row["peak"] <= 100.0
 
-    async def test_size_budget_and_activations_not_inlined(
+    async def test_flow_continuity_shape(
+        self,
+        client,
+        persona_fixture,
+        ui_screens_fixture,
+        monkeypatch,
+        sim_log_3_screens,
+    ) -> None:
+        async def fake_simulate(_persona, _content):
+            return sim_log_3_screens
+
+        async def fake_grounding(_content, _sim_log):
+            return None
+
+        monkeypatch.setattr("backend.core.queue.simulation.simulate", fake_simulate)
+        monkeypatch.setattr("backend.core.queue.grounding.judge", fake_grounding)
+        _patch_surface_text_inference(monkeypatch)
+        _patch_surface_atlas(monkeypatch)
+
+        response = await client.post(
+            "/analyze",
+            json={"persona_id": persona_fixture, "content_id": ui_screens_fixture},
+        )
+        final = await _wait_for_terminal(client, response.json()["job_id"])
+
+        circuits = final["result"]["flow_continuity"]["circuits"]
+        assert set(circuits.keys()) == set(CIRCUIT_NAMES)
+        for continuity in circuits.values():
+            assert set(continuity.keys()) == {"per_screen", "trend"}
+            assert len(continuity["per_screen"]) == 3
+            assert continuity["trend"] in ("rising", "dropping", "flat", "volatile")
+            for point in continuity["per_screen"]:
+                assert set(point.keys()) == {"screen_index", "score_0_100", "delta_from_prev"}
+
+    async def test_result_size_under_100kb(
         self,
         client,
         persona_fixture,

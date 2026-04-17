@@ -9,14 +9,20 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.core import database
+from backend.models.results import AnalysisResult, SCHEMA_VERSION
 from backend.models.content import Content
 from backend.models.job import Job, StageEnum
 from backend.models.persona import Persona
 from backend.models.simulation import HallucinationError, SchemaValidationFailure
+from backend.services.continuity import compute_flow_continuity
 from backend.services import grounding, simulation
 from backend.services.inference import run_tribev2_text, run_tribev2_video
 from backend.services.overlay import derive_overlays
-from backend.services.roi_aggregation import aggregate_screen_roi, get_surf_atlas
+from backend.services.roi_aggregation import (
+    aggregate_screen_roi,
+    get_surf_atlas,
+    rescale_to_0_100,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -167,24 +173,42 @@ async def _process_job(job_id: str) -> None:
 
         async with database.async_session() as session:
             job = (await session.execute(select(Job).where(Job.id == job_id))).scalar_one()
-            existing = job.result_json or {}
-            existing["activations"] = activations_manifest
-            existing["_roi_native_tmp"] = roi_per_screen_native
-            job.result_json = existing
-            await session.commit()
-
-        async with database.async_session() as session:
-            job = (await session.execute(select(Job).where(Job.id == job_id))).scalar_one()
             await transition(session, job, StageEnum.PROCESSING)
+
+        roi_per_screen_rescaled = rescale_to_0_100(
+            [
+                {
+                    "circuits": native["circuits"],
+                    "regions": native["regions"],
+                }
+                for native in roi_per_screen_native
+            ]
+        )
+        roi_per_screen = [
+            {"screen_index": native["screen_index"], **rescaled}
+            for native, rescaled in zip(roi_per_screen_native, roi_per_screen_rescaled)
+        ]
         overlays = derive_overlays(sim_log, content_type=content.content_type)
+        flow_continuity = compute_flow_continuity(roi_per_screen)
 
         async with database.async_session() as session:
             job = (await session.execute(select(Job).where(Job.id == job_id))).scalar_one()
-            job.result_json = {
-                **(job.result_json or {}),
-                "simulation": sim_log.model_dump(),
-                "overlays": [overlay.model_dump() for overlay in overlays],
-            }
+            await transition(session, job, StageEnum.RECOMMENDATIONS)
+
+        recommendations_dump: list[dict[str, object]] = []
+        envelope = AnalysisResult(
+            schema_version=SCHEMA_VERSION,
+            simulation=sim_log.model_dump(),
+            overlays=[overlay.model_dump() for overlay in overlays],
+            activations=activations_manifest,
+            roi=roi_per_screen,
+            flow_continuity=flow_continuity,
+            recommendations=recommendations_dump,
+        )
+
+        async with database.async_session() as session:
+            job = (await session.execute(select(Job).where(Job.id == job_id))).scalar_one()
+            job.result_json = envelope.model_dump()
             job.status = "DONE"
             await transition(session, job, None)
         return

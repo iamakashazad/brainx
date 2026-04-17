@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import json
 import time
 from unittest.mock import AsyncMock, patch
@@ -221,48 +222,40 @@ async def test_bad_content(client, persona_fixture):
     assert response.status_code == 404
 
 
-async def test_stage_transitions(client, persona_fixture, text_content_fixture, monkeypatch):
+async def test_stage_transitions(client, persona_fixture, text_content_fixture, monkeypatch, caplog):
     from backend.core.config import settings
-    from backend.services import simulation as simulation_service
 
     monkeypatch.setattr(settings, "deepseek_api_key", "deepseek-test")
-    original_simulate = simulation_service.simulate
-
-    async def slow_simulate(persona, content):
-        await asyncio.sleep(0.05)
-        return await original_simulate(persona, content)
-
     _patch_surface_text_inference(monkeypatch, delay=0.05)
     _patch_surface_atlas(monkeypatch)
-    monkeypatch.setattr("backend.core.queue.simulation.simulate", slow_simulate)
-    seen_stages: set[str] = set()
 
     with respx.mock(assert_all_called=False) as router:
         router.post("https://api.deepseek.com/chat/completions").mock(
             return_value=httpx.Response(200, json={"choices": [{"message": {"content": VALID_SIM_JSON}}]})
         )
-        response = await client.post(
-            "/analyze",
-            json={"persona_id": persona_fixture, "content_id": text_content_fixture},
-        )
-        job_id = response.json()["job_id"]
-        for _ in range(120):
-            poll = await client.get(f"/jobs/{job_id}")
-            body = poll.json()
-            if body.get("stage"):
-                seen_stages.add(body["stage"])
-            if body["status"] in {"DONE", "ERROR"}:
-                final = body
-                break
-            await asyncio.sleep(0.02)
-        else:
-            raise AssertionError("job did not complete")
+        with caplog.at_level(logging.INFO, logger="backend.core.queue"):
+            response = await client.post(
+                "/analyze",
+                json={"persona_id": persona_fixture, "content_id": text_content_fixture},
+            )
+            final = await _wait_for_terminal(client, response.json()["job_id"])
 
     assert final["status"] == "DONE", final
-    assert "simulation" in seen_stages
-    assert "inference" in seen_stages
-    assert "_roi_native_tmp" in final["result"]
+    messages = [record.getMessage() for record in caplog.records]
+    for expected in (
+        "simulation",
+        "grounding_check",
+        "inference",
+        "roi_aggregation",
+        "processing",
+        "recommendations",
+    ):
+        assert any(expected in message for message in messages), f"missing {expected}"
+    assert final["result"]["schema_version"] == 1
+    assert "flow_continuity" in final["result"]
+    assert "roi" in final["result"]
     assert "activations" in final["result"]
+    assert "_roi_native_tmp" not in final["result"]
 
 
 async def test_failure_policy_simulation_retry(client, persona_fixture, text_content_fixture, monkeypatch):
