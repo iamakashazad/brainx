@@ -13,6 +13,8 @@ from httpx import ASGITransport, AsyncClient
 from PIL import Image
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+pytest_plugins = ("tests.fixtures.sim_log_3_screens",)
+
 ROOT = Path(__file__).resolve().parents[1]
 
 if str(ROOT) not in sys.path:
