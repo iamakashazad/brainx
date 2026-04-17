@@ -733,7 +733,7 @@ async def test_blind_eval_differentiates_opposite_profiles(persona_fixture, sim_
 | A4 | Trend-delta floor of ±5 on the 0–100 scale is sensible. | Pattern 5, `continuity.py` | [ASSUMED — Claude's discretion per CONTEXT.md D-12] If the floor is too high, all trends collapse to "flat"; too low, everything is "volatile". Module-level constant makes tuning a one-liner. No migration needed. |
 | A5 | Cached atlas fetch under `model_cache/nilearn/` works offline for subsequent runs. | Pattern 1 | [ASSUMED from existing pattern in current `get_atlas_labels`] If cache fails (e.g., first CI run), first test invocation will try to download — takes ~seconds for this small atlas. No risk beyond a one-time network dependency. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **TRIBEv2 output vertex count — exactly 20,484 or 20,004?**
    - What we know: fsaverage5 is 10,242 vertices per hemisphere (20,484 bilateral). PITFALLS.md and STACK.md cite "~20k" and one place says `20,004`.
