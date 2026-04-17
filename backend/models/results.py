@@ -37,7 +37,12 @@ class ScreenROI(BaseModel):
 
 
 class AnalysisResult(BaseModel):
-    """Stable Phase 3 analyze result envelope."""
+    """Stable Phase 3 analyze result envelope.
+
+    Recommendations stay JSON-dict-shaped in the envelope to avoid coupling this
+    module back to the recommendations schema. Queue-stage code validates them
+    through `Recommendations` before persisting the dumped payload here.
+    """
 
     schema_version: Literal[1] = 1
     simulation: dict[str, Any]
