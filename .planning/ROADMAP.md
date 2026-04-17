@@ -69,9 +69,9 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 03-01: TRIBEv2 inference service integration — connect simulation output to inference, nilearn Destrieux atlas ROI aggregation, per-screen activation arrays (BRAIN-01, BRAIN-02)
-- [ ] 03-02: Flow-level continuity analysis + BRAIN-04 ROI score table + full result persistence schema (BRAIN-03, BRAIN-04)
-- [ ] 03-03: Recommendations engine — DeepSeek structured output with evidence_roi + activation_score fields, blind evaluation test (REC-01, REC-02, REC-03, REC-04)
+- [ ] 03-01-PLAN.md — Per-screen TRIBEv2 inference loop + nilearn fsaverage5 surface-atlas ROI aggregation (D-15 correctness fix, A1 vertex-count guard) (BRAIN-01, BRAIN-02)
+- [ ] 03-02-PLAN.md — Flow continuity (rising/dropping/flat/volatile trends) + schema_version:1 result_json envelope + 0–100 global rescale (BRAIN-03, BRAIN-04)
+- [ ] 03-03-PLAN.md — Recommendations engine — DeepSeek-V3 structured output with mandatory evidence field, blind-eval Jaccard < 0.4 gate with live-key fallback (REC-01, REC-02, REC-03, REC-04)
 
 ### Phase 4: Frontend — Upload, Persona, and Results
 **Goal**: Users can submit an analysis through a complete React web UI and view brain activation maps alongside grounded recommendations in a single results panel
