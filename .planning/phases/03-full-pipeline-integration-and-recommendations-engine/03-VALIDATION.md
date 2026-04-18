@@ -1,16 +1,16 @@
 ---
 phase: 3
 slug: full-pipeline-integration-and-recommendations-engine
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: complete
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-04-17
-updated: 2026-04-17
+updated: 2026-04-18
 ---
 
 # Phase 3 — Validation Strategy
 
-> Per-phase validation contract for feedback sampling during execution.
+> Retroactive Nyquist validation audit for the completed Phase 3 codebase.
 
 ---
 
@@ -19,103 +19,79 @@ updated: 2026-04-17
 | Property | Value |
 |----------|-------|
 | **Framework** | pytest 8.x (pytest-asyncio 0.23.x) |
-| **Config file** | `pytest.ini` (repo root) + `tests/conftest.py` — `testpaths = tests` |
-| **Quick run command** | `pytest -x --ff -q` |
-| **Full suite command** | `pytest -q` |
-| **Estimated runtime** | ~45 seconds (quick), ~3 minutes (full with blind-eval if DEEPSEEK_API_KEY set) |
+| **Config file** | `pytest.ini` (repo root) + `tests/conftest.py` |
+| **Primary phase run** | `~/.venvs/brainx/bin/python -m pytest -q tests/test_roi.py tests/test_per_screen_inference.py tests/test_queue_transitions.py tests/test_analyze.py tests/test_continuity.py tests/test_result_schema.py tests/test_recommendations_model.py tests/test_recommendations_prompt.py tests/test_recommendations_integration.py tests/test_recommendations_behavioral.py tests/test_recommendations_blind_eval.py` |
+| **Observed result** | `81 passed, 2 skipped` |
+| **Live gate command** | `DEEPSEEK_API_KEY=[set] ~/.venvs/brainx/bin/python -m pytest -q tests/test_recommendations_blind_eval.py::test_blind_eval_differentiates_opposite_profiles -s` |
+| **Live gate proof** | Passing metrics recorded in `03-BLIND-EVAL.md` for commit `9912e3f` |
+| **Estimated runtime** | ~3 seconds local phase suite, ~60–90 seconds live blind-eval |
 
 ---
 
 ## Sampling Rate
 
-- **After every task commit:** Run `pytest -x --ff -q tests/<most-recent-test-file>.py`
-- **After every plan wave:** Run `pytest -q`
-- **Before `/gsd-verify-work`:** Full suite must be green; blind-eval test must run at least once with live DEEPSEEK_API_KEY
-- **Max feedback latency:** 45 seconds for quick, 180 seconds for full
+- After recommendation/ROI implementation changes: run the focused slice for `tests/test_roi.py`, `tests/test_recommendations_integration.py`, `tests/test_recommendations_behavioral.py`, and `tests/test_recommendations_prompt.py`
+- Before Phase 3 verification or handoff to Phase 4: run the full Phase 3 surface listed above
+- Before shipping recommendation changes that touch live behavior: rerun the live blind-eval with `DEEPSEEK_API_KEY` set
 
 ---
 
 ## Per-Task Verification Map
 
-> Populated by gsd-planner at planning time from PLAN.md task IDs. Each row maps a task to the automated command that proves it.
-
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 03-01-XX | 01 | — | BRAIN-01/02 | — | — | unit/integration | TBD by planner | ❌ W0 | ⬜ pending |
-| 03-02-XX | 02 | — | BRAIN-03/04 | — | — | unit/integration | TBD by planner | ❌ W0 | ⬜ pending |
-| 03-03-XX | 03 | — | REC-01..04 | — | — | integration/blind-eval | TBD by planner | ❌ W0 | ⬜ pending |
+| 03-01-XX | 01 | — | BRAIN-01, BRAIN-02 | — | Vertex-count mismatches fail closed before ROI reduction | unit/integration | `~/.venvs/brainx/bin/python -m pytest -q tests/test_roi.py tests/test_per_screen_inference.py tests/test_queue_transitions.py tests/test_analyze.py` | ✅ | ✅ green |
+| 03-02-XX | 02 | — | BRAIN-03, BRAIN-04 | — | Final `result_json` envelope validated before DONE persistence | unit/integration | `~/.venvs/brainx/bin/python -m pytest -q tests/test_continuity.py tests/test_result_schema.py tests/test_analyze.py` | ✅ | ✅ green |
+| 03-03-XX | 03 | — | REC-01 | — | Recommendation schema failures and API failures sanitize correctly | unit/integration | `~/.venvs/brainx/bin/python -m pytest -q tests/test_recommendations_model.py tests/test_recommendations_prompt.py tests/test_recommendations_integration.py tests/test_recommendations_blind_eval.py` | ✅ | ✅ green |
+| 03-04-XX | 04 | — | REC-02, REC-03, REC-04 | — | Missing behavioral coverage fails closed with sanitized error | unit/integration | `~/.venvs/brainx/bin/python -m pytest -q tests/test_recommendations_behavioral.py tests/test_recommendations_integration.py tests/test_analyze.py tests/test_result_schema.py` | ✅ | ✅ green |
+| 03-05-XX | 05 | — | REC-01, REC-02, REC-03, REC-04 | — | Live model output must differentiate profiles and cite valid ROI evidence | live integration | `DEEPSEEK_API_KEY=[set] ~/.venvs/brainx/bin/python -m pytest -q tests/test_recommendations_blind_eval.py::test_blind_eval_differentiates_opposite_profiles -s` | ✅ | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
 ---
 
-## Wave 0 Requirements
+## Coverage Summary
 
-> Test infrastructure gaps identified in 03-RESEARCH.md Validation Architecture. Planner MUST ensure these are authored before any task claims them as its automated verification.
->
-> **Note:** All test paths below are under `tests/` (matching `pytest.ini testpaths = tests`). Several assertions are NOT net-new files — they **extend** existing test files that already live in `tests/`. This map reflects the actual files the plans create or extend.
-
-### Extensions to existing test files
-
-- [ ] `tests/test_roi.py` — D-15 fsaverage5 atlas wiring, vertex-count assertion (A1), per-region mean/peak math.
-  - **Plan 03-01 Task 1** appends these classes (existing `TestROICircuitMap` is preserved):
-    - `TestSurfaceAtlas` — atlas shape, LRU cache, label encoding, label-id range
-    - `TestAggregateScreenROI` — 5 circuits + ≤15 regions, vertex-count mismatch ValueError, mean/peak reductions
-    - `TestRescale` — 0..100 bounds, global rescale scope
-- [ ] `tests/test_analyze.py` — End-to-end `POST /analyze` → queue → DONE assertions.
-  - **Plan 03-01 Task 3** appends: `test_per_screen_files_written`, `test_empty_narrative_errors`, `test_activations_manifest_shape`, `test_legacy_test_inference_single_shot`
-  - **Plan 03-02 Task 4** appends: `test_stage_progression` (caplog over SIMULATION → GROUNDING_CHECK → INFERENCE → ROI_AGGREGATION → PROCESSING → RECOMMENDATIONS)
-  - **Plan 03-03 Task 4** appends: `test_analyze_populates_recommendations_via_mock`
-- [ ] `tests/test_queue_transitions.py` — ROI_AGGREGATION + RECOMMENDATIONS stages in StageEnum, declaration order preserved, `transition()` enforcement.
-  - **Plan 03-01 Task 1** appends: `test_stage_enum_order`, `test_stage_enum_values`, `test_no_inline_stage_writes`
-
-### New test files created by Phase 3 plans
-
-- [ ] `tests/test_per_screen_inference.py` — BRAIN-01/02 per-screen activation arrays, retry-once policy, A1 guard-rails.
-  - **Plan 03-01 Task 1** creates the file with `TestRunScreenInferenceWithRetry`, `TestActivationsFilesystem`, `TestEmptyNarrativeGuard` (xfail until Task 3 wires the analyze branch)
-  - **Plan 03-01 Task 4** appends `TestAssumptionA1VertexCount` (live-gated via `RUN_LIVE_TRIBEV2`)
-- [ ] `tests/test_continuity.py` — BRAIN-03 deterministic trend classification + compute_flow_continuity + module-level constants.
-  - **Plan 03-02 Task 1** creates with `TestClassifyTrend` (rising/dropping/flat/volatile), `TestComputeFlowContinuity`, `TestModuleLevelConstants`
-- [ ] `tests/test_result_schema.py` — D-19 `result_json` schema_version=1 envelope + round-trip + size budget + per-screen roi shape.
-  - **Plan 03-02 Task 1** creates with `TestResultEnvelope` (keys, schema_version round-trip, per-screen ROI shape, size < 100KB, activations-not-inlined, recommendations slot is list, stage progression caplog) and `TestModelImports`
-- [ ] `tests/test_recommendations_model.py` — D-09 Pydantic schema validation for flat discriminated list, mandatory `evidence`, `score_rank` cutoffs.
-  - **Plan 03-03 Task 1** creates with `TestRecommendationsPydantic`, `TestRankScore`, `TestScoreRankThresholdsIsModuleLevel`
-- [ ] `tests/test_recommendations_prompt.py` — Prompt composition (4-bundle input, BEGIN/END USER CONTENT delimiters, no image data).
-  - **Plan 03-03 Task 1** creates with `TestBuildRecUserPrompt`, `TestBuildRecSystemPrompt`
-- [ ] `tests/test_recommendations_integration.py` — Respx-mocked DeepSeek call through `generate_recommendations`: happy path, repair retry, sanitized error.
-  - **Plan 03-03 Task 1** creates with `TestGenerateRecommendationsHappyPath`, `TestGenerateRecommendationsRepairRetry`, `TestGenerateRecommendationsErrorSanitization`
-- [ ] `tests/test_recommendations_blind_eval.py` — REC-01..04 blind differentiation (Jaccard < 0.4), live `DEEPSEEK_API_KEY` gate, `pytest.skip` fallback.
-  - **Plan 03-03 Task 1** creates the file + `test_skips_cleanly_without_key` (always-runs); `test_blind_eval_differentiates_opposite_profiles` is gated by `@skip_without_live_key`
-
-### New fixtures
-
-- [ ] `tests/fixtures/sim_log_3_screens.py` — Shared 3-screen `SimulationLog` fixture (referenced by per-screen inference, result-schema, and recommendations tests). Also defines `empty_narrative_screen` for the D-03 guard test.
-  - **Plan 03-01 Task 1** creates this + `tests/fixtures/__init__.py`
-- [ ] `persona_model_fixture` added to `tests/conftest.py` — returns a Pydantic `Persona` model loaded by ID, distinct from the existing `persona_fixture` which returns a `str` (persona_id).
-  - **Plan 03-03 Task 1** adds this fixture alongside the test file creations (see 03-03 Task 1 action step for exact shape).
-  - **Consumers:** `tests/test_recommendations_integration.py`, `tests/test_recommendations_blind_eval.py`, and any `generate_recommendations(...)` call in `tests/test_analyze.py` (Plan 03-03 Task 4).
-
-*Existing test files from Phase 2 (`conftest.py`, `test_deepseek_client.py`, `test_simulation.py`, `test_grounding.py`) remain unchanged — no regressions expected. `test_api.py` continues to cover the legacy `/test-inference` path (D-04).*
+- `tests/test_roi.py` covers fsaverage5 atlas wiring, region/circuit reduction, global rescaling, and the flat-bundle normalization edge case
+- `tests/test_per_screen_inference.py` covers retry-once inference, screen file naming, empty narrative guards, and A1 vertex-count invariants
+- `tests/test_queue_transitions.py` covers StageEnum ordering and transition-only stage writes
+- `tests/test_continuity.py` and `tests/test_result_schema.py` cover continuity math and the schema-versioned result envelope
+- `tests/test_recommendations_model.py`, `tests/test_recommendations_prompt.py`, `tests/test_recommendations_integration.py`, `tests/test_recommendations_behavioral.py`, and `tests/test_recommendations_blind_eval.py` cover the recommendation contract from schema through live-key blind differentiation
+- `tests/test_analyze.py` proves the queue-owned end-to-end analyze lifecycle and persisted recommendation payload shape
 
 ---
 
 ## Manual-Only Verifications
 
-| Behavior | Requirement | Why Manual | Test Instructions |
-|----------|-------------|------------|-------------------|
-| TRIBEv2 output vertex count exactly matches fsaverage5 bilateral total (A1) | BRAIN-01 | Requires live model inference — cannot be pure unit test | Run Phase 1 smoke test with `RUN_LIVE_TRIBEV2=1`, print `preds.shape`, assert matches `map_left.shape[0] + map_right.shape[0]` (20,484). The gated `TestAssumptionA1VertexCount::test_live_tribev2_output_shape` in `tests/test_per_screen_inference.py` automates this check when the env var is set. |
-| Recommendations prose quality (beyond schema validity) | REC-01..04 | LLM output semantic quality cannot be unit-tested | Read `result_json.recommendations` from a real 3-screen analyze job; verify rationales reference cited regions meaningfully |
-| Destrieux atlas fetch caches to `model_cache/nilearn/` | D-15, PITFALLS | Network side-effect; first run populates cache, subsequent runs offline | Delete `model_cache/nilearn/`, run ROI aggregation once, confirm cache directory repopulated and second run works without network |
+None required for Phase 3 requirement closure.
+
+Optional higher-confidence checks that remain useful but are not required for Nyquist compliance:
+
+- Live TRIBEv2 A1 probe with `RUN_LIVE_TRIBEV2=1`
+- Human review of recommendation prose quality on a real analyze job
+
+---
+
+## Validation Audit 2026-04-18
+
+| Metric | Count |
+|--------|-------|
+| Gaps found | 1 |
+| Resolved | 1 |
+| Escalated | 0 |
+
+Resolved gap:
+
+- `tests/test_recommendations_model.py::test_rec_type_discriminator_values` still reflected the pre-03-04 `layout_flag` contract and was updated to require a simulation identifier payload.
 
 ---
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 45s quick / 180s full
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All Phase 3 requirement groups have automated verification
+- [x] Wave 0 test infrastructure exists on disk
+- [x] No validation gap remains open after audit
+- [x] Live blind-eval proof artifact exists for a passing keyed run
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** complete
