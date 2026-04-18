@@ -104,6 +104,7 @@ class TestResultEnvelope:
             "roi",
             "flow_continuity",
             "recommendations",
+            "pathway",
         }
         assert "_roi_native_tmp" not in final["result"]
 
@@ -122,6 +123,11 @@ class TestResultEnvelope:
                 }
             },
             "recommendations": [],
+            "pathway": {
+                "selected_pathway": "text",
+                "slideshow_path": None,
+                "durations": [],
+            },
         }
 
         model = AnalysisResult.model_validate(payload)

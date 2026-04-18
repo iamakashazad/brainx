@@ -9,9 +9,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.core import database
+from backend.models.content import Content, ContentType
 from backend.models.recommendations import Recommendations
 from backend.models.results import AnalysisResult, SCHEMA_VERSION
-from backend.models.content import Content
 from backend.models.job import Job, StageEnum
 from backend.models.persona import Persona
 from backend.models.simulation import DeepSeekClientError, HallucinationError, SchemaValidationFailure
@@ -20,10 +20,17 @@ from backend.services import grounding, simulation
 from backend.services.recommendations import generate_recommendations
 from backend.services.inference import run_tribev2_text, run_tribev2_video
 from backend.services.overlay import derive_overlays
+from backend.services.pathway_config import resolve_runtime_pathway
 from backend.services.roi_aggregation import (
     aggregate_screen_roi,
     get_surf_atlas,
     rescale_to_0_100,
+)
+from backend.services.video_slideshow import (
+    create_slideshow,
+    derive_slideshow_durations,
+    resolve_uploaded_image_paths,
+    split_video_activation_by_screen,
 )
 
 logger = logging.getLogger(__name__)
@@ -62,6 +69,44 @@ async def transition(session: AsyncSession, job: Job, stage: StageEnum | None) -
 def _validate_screen_narrative(screen_index: int, narrative: str) -> None:
     if not narrative.strip():
         raise RuntimeError(f"Empty or whitespace-only narrative on screen {screen_index}")
+
+
+def _workspace_relative_path(path: Path | str) -> str:
+    artifact_path = Path(path)
+    if artifact_path.is_absolute():
+        try:
+            return artifact_path.relative_to(Path.cwd()).as_posix()
+        except ValueError as exc:
+            raise RuntimeError(
+                f"Artifact path must stay workspace-relative, got {artifact_path.as_posix()}"
+            ) from exc
+    return artifact_path.as_posix()
+
+
+def _save_per_screen_activations(
+    job_act_dir: Path,
+    screen_indices: list[int],
+    per_screen_arrays: list[np.ndarray],
+) -> list[dict[str, str | int | list[int]]]:
+    if len(screen_indices) != len(per_screen_arrays):
+        raise RuntimeError(
+            f"Expected {len(screen_indices)} per-screen activations, got {len(per_screen_arrays)}"
+        )
+
+    activations_manifest: list[dict[str, str | int | list[int]]] = []
+    for screen_index, arr in zip(screen_indices, per_screen_arrays):
+        out_path = job_act_dir / f"screen_{screen_index + 1}.npy"
+        np.save(out_path, arr)
+        activations_manifest.append(
+            {
+                "screen_index": screen_index,
+                "path": _workspace_relative_path(out_path),
+                "shape": list(arr.shape),
+                "timesteps": int(arr.shape[0]),
+            }
+        )
+
+    return activations_manifest
 
 
 async def gpu_worker_loop() -> None:
@@ -131,31 +176,75 @@ async def _process_job(job_id: str) -> None:
             await transition(session, job, StageEnum.GROUNDING_CHECK)
         await grounding.judge(content, sim_log)
 
+        selected_pathway = resolve_runtime_pathway(content)
         async with database.async_session() as session:
             job = (await session.execute(select(Job).where(Job.id == job_id))).scalar_one()
             await transition(session, job, StageEnum.INFERENCE)
 
-        job_act_dir = Path("activations") / job_id
-        job_act_dir.mkdir(parents=True, exist_ok=True)
-        activations_manifest: list[dict[str, str | int | list[int]]] = []
-        per_screen_arrays: list[np.ndarray] = []
-
         for screen in sim_log.screens:
             _validate_screen_narrative(screen.screen_index, screen.narrative_text)
-            arr = await _run_screen_inference_with_retry(
-                screen.screen_index,
-                screen.narrative_text,
+
+        job_act_dir = Path("activations") / job_id
+        job_act_dir.mkdir(parents=True, exist_ok=True)
+        screen_indices = [screen.screen_index for screen in sim_log.screens]
+        pathway_metadata: dict[str, str | list[float] | None] = {
+            "selected_pathway": selected_pathway,
+            "slideshow_path": None,
+            "durations": [],
+        }
+
+        if selected_pathway == "video":
+            image_paths = resolve_uploaded_image_paths(content)
+            durations = derive_slideshow_durations(sim_log, content.content_type)
+            if len(durations) != len(sim_log.screens):
+                raise RuntimeError(
+                    "Slideshow duration count must match simulated screen count; "
+                    f"got {len(durations)} durations for {len(sim_log.screens)} screens"
+                )
+            if content.content_type == ContentType.UI_SCREENS.value and len(image_paths) != len(sim_log.screens):
+                raise RuntimeError(
+                    "Uploaded UI screen count must match simulated screen count; "
+                    f"got {len(image_paths)} files for {len(sim_log.screens)} screens"
+                )
+            if content.content_type == ContentType.STATIC.value and len(image_paths) != 1:
+                raise RuntimeError(
+                    f"Static content must resolve to exactly one uploaded image, got {len(image_paths)}"
+                )
+
+            slideshow_path = job_act_dir / "fallback_slideshow.mp4"
+            slideshow_artifact = create_slideshow(
+                image_paths=image_paths,
+                durations=durations,
+                output_path=slideshow_path.as_posix(),
             )
-            out_path = job_act_dir / f"screen_{screen.screen_index + 1}.npy"
-            np.save(out_path, arr)
-            per_screen_arrays.append(arr)
-            activations_manifest.append(
-                {
-                    "screen_index": screen.screen_index,
-                    "path": out_path.as_posix(),
-                    "shape": list(arr.shape),
-                    "timesteps": int(arr.shape[0]),
-                }
+            video_activation = await _run_video_inference_with_retry(slideshow_artifact)
+            per_screen_arrays = split_video_activation_by_screen(
+                activation=video_activation,
+                durations=durations,
+                screen_count=len(sim_log.screens),
+            )
+            activations_manifest = _save_per_screen_activations(
+                job_act_dir=job_act_dir,
+                screen_indices=screen_indices,
+                per_screen_arrays=per_screen_arrays,
+            )
+            pathway_metadata = {
+                "selected_pathway": "video",
+                "slideshow_path": _workspace_relative_path(slideshow_artifact),
+                "durations": durations,
+            }
+        else:
+            per_screen_arrays = []
+            for screen in sim_log.screens:
+                arr = await _run_screen_inference_with_retry(
+                    screen.screen_index,
+                    screen.narrative_text,
+                )
+                per_screen_arrays.append(arr)
+            activations_manifest = _save_per_screen_activations(
+                job_act_dir=job_act_dir,
+                screen_indices=screen_indices,
+                per_screen_arrays=per_screen_arrays,
             )
 
         async with database.async_session() as session:
@@ -214,6 +303,7 @@ async def _process_job(job_id: str) -> None:
             roi=roi_per_screen,
             flow_continuity=flow_continuity,
             recommendations=recommendations_dump,
+            pathway=pathway_metadata,
         )
 
         async with database.async_session() as session:
@@ -279,6 +369,18 @@ async def _run_screen_inference_with_retry(screen_index: int, narrative: str) ->
             raise RuntimeError(
                 f"Inference failed for screen {screen_index} after 2 attempts: {last_error}"
             ) from exc
+
+
+async def _run_video_inference_with_retry(video_path: str) -> np.ndarray:
+    last_error = "unknown error"
+    for attempt in range(2):
+        try:
+            return await run_tribev2_video(video_path)
+        except Exception as exc:
+            last_error = str(exc)
+            if attempt == 0:
+                continue
+            raise RuntimeError(f"Video inference failed after 2 attempts: {last_error}") from exc
 
 
 async def _run_inference_only(job_id: str, input_type: str, input_payload: str) -> None:
