@@ -4,6 +4,7 @@ import asyncio
 import logging
 import json
 import time
+from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import httpx
@@ -14,6 +15,7 @@ from sqlalchemy import select
 
 from backend.core import database
 from backend.models.job import Job
+from backend.services.pathway_config import set_default_pathway
 from tests.fixtures.sim_log_3_screens import empty_narrative_screen, sim_log_3_screens
 
 pytestmark = pytest.mark.asyncio
@@ -25,6 +27,13 @@ def _stub_queue_recommendations(
     mixed_recommendations_payload,
 ):
     stub_queue_recommendations(mixed_recommendations_payload)
+
+
+@pytest.fixture(autouse=True)
+def _reset_default_pathway() -> None:
+    set_default_pathway("text")
+    yield
+    set_default_pathway("text")
 
 VALID_SIM_JSON = json.dumps(
     {
@@ -144,6 +153,15 @@ def _patch_surface_text_inference(
     monkeypatch.setattr("backend.core.queue.run_tribev2_text", fake_text_inference)
 
 
+def _patch_surface_video_inference(
+    monkeypatch: pytest.MonkeyPatch,
+    activation: np.ndarray,
+) -> AsyncMock:
+    fake_video_inference = AsyncMock(return_value=activation)
+    monkeypatch.setattr("backend.core.queue.run_tribev2_video", fake_video_inference)
+    return fake_video_inference
+
+
 def _patch_surface_atlas(monkeypatch: pytest.MonkeyPatch) -> None:
     labels = ["Unknown"] + [
         "S_front_inf",
@@ -186,6 +204,7 @@ async def test_happy_path(client, persona_fixture, text_content_fixture, monkeyp
     from backend.core.config import settings
 
     monkeypatch.setattr(settings, "deepseek_api_key", "deepseek-test")
+    set_default_pathway("video")
     _patch_surface_text_inference(monkeypatch)
     _patch_surface_atlas(monkeypatch)
     with respx.mock(assert_all_called=False) as router:
@@ -212,8 +231,12 @@ async def test_happy_path(client, persona_fixture, text_content_fixture, monkeyp
 
     assert final["status"] == "DONE", final
     assert final["result"]["simulation"]["screens"][0]["narrative_text"] == "user reads ad"
+    assert final["result"]["pathway"]["selected_pathway"] == "text"
+    assert final["result"]["pathway"]["slideshow_path"] is None
+    assert final["result"]["pathway"]["durations"] == []
     rec_types = {rec["rec_type"] for rec in final["result"]["recommendations"]}
     assert {"layout_flag", "memorability", "emotional_dropoff"} <= rec_types
+    set_default_pathway("text")
 
 
 async def test_bad_persona(client, text_content_fixture):
@@ -496,3 +519,117 @@ async def test_legacy_test_inference_single_shot(client, monkeypatch, tmp_path):
     assert final["result"]["shape"] == [2, 8]
     assert (tmp_path / "activations" / f"{response.json()['job_id']}.npy").exists()
     assert not (tmp_path / "activations" / response.json()["job_id"] / "screen_2.npy").exists()
+
+
+async def test_visual_analyze_uses_video_fallback_when_default_pathway_is_video(
+    client,
+    persona_fixture,
+    ui_screens_fixture,
+    monkeypatch,
+    tmp_path,
+    sim_log_3_screens,
+):
+    async def fake_simulate(_persona, _content):
+        return sim_log_3_screens
+
+    async def fake_grounding(_content, _sim_log):
+        return None
+
+    def fake_create_slideshow(
+        image_paths: list[str],
+        durations: list[float],
+        output_path: str | None = None,
+        fps: int = 24,
+    ) -> str:
+        assert image_paths
+        assert durations == [1.0, 1.1, 2.3]
+        assert fps == 24
+        assert output_path is not None
+        target = Path(output_path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"fake-mp4")
+        return target.as_posix()
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("backend.core.queue.simulation.simulate", fake_simulate)
+    monkeypatch.setattr("backend.core.queue.grounding.judge", fake_grounding)
+    monkeypatch.setattr("backend.core.queue.create_slideshow", fake_create_slideshow)
+    fake_text_inference = AsyncMock(side_effect=AssertionError("text path should not run"))
+    monkeypatch.setattr("backend.core.queue.run_tribev2_text", fake_text_inference)
+    fake_video_inference = _patch_surface_video_inference(
+        monkeypatch,
+        np.ones((6, 20484), dtype=np.float32),
+    )
+    _patch_surface_atlas(monkeypatch)
+    set_default_pathway("video")
+
+    response = await client.post(
+        "/analyze",
+        json={"persona_id": persona_fixture, "content_id": ui_screens_fixture},
+    )
+    final = await _wait_for_terminal(client, response.json()["job_id"])
+
+    assert final["status"] == "DONE", final
+    assert fake_video_inference.await_count == 1
+    assert fake_text_inference.await_count == 0
+    assert final["result"]["pathway"] == {
+        "selected_pathway": "video",
+        "slideshow_path": f"activations/{response.json()['job_id']}/fallback_slideshow.mp4",
+        "durations": [1.0, 1.1, 2.3],
+    }
+    manifest = final["result"]["activations"]
+    assert [entry["timesteps"] for entry in manifest] == [1, 2, 3]
+    job_dir = tmp_path / "activations" / response.json()["job_id"]
+    assert (job_dir / "fallback_slideshow.mp4").exists()
+    assert (job_dir / "screen_1.npy").exists()
+    assert (job_dir / "screen_2.npy").exists()
+    assert (job_dir / "screen_3.npy").exists()
+    set_default_pathway("text")
+
+
+async def test_video_fallback_errors_when_activation_is_too_short(
+    client,
+    persona_fixture,
+    ui_screens_fixture,
+    monkeypatch,
+    tmp_path,
+    sim_log_3_screens,
+):
+    async def fake_simulate(_persona, _content):
+        return sim_log_3_screens
+
+    async def fake_grounding(_content, _sim_log):
+        return None
+
+    def fake_create_slideshow(
+        image_paths: list[str],
+        durations: list[float],
+        output_path: str | None = None,
+        fps: int = 24,
+    ) -> str:
+        target = Path(output_path or tmp_path / "fallback.mp4")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"fake-mp4")
+        return target.as_posix()
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("backend.core.queue.simulation.simulate", fake_simulate)
+    monkeypatch.setattr("backend.core.queue.grounding.judge", fake_grounding)
+    monkeypatch.setattr("backend.core.queue.create_slideshow", fake_create_slideshow)
+    monkeypatch.setattr(
+        "backend.core.queue.run_tribev2_text",
+        AsyncMock(side_effect=AssertionError("text path should not run")),
+    )
+    _patch_surface_video_inference(monkeypatch, np.ones((2, 20484), dtype=np.float32))
+    _patch_surface_atlas(monkeypatch)
+    set_default_pathway("video")
+
+    response = await client.post(
+        "/analyze",
+        json={"persona_id": persona_fixture, "content_id": ui_screens_fixture},
+    )
+    final = await _wait_for_terminal(client, response.json()["job_id"])
+
+    assert final["status"] == "ERROR"
+    assert "at least one timestep per screen" in final["error"]
+    set_default_pathway("text")
