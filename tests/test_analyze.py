@@ -18,6 +18,14 @@ from tests.fixtures.sim_log_3_screens import empty_narrative_screen, sim_log_3_s
 
 pytestmark = pytest.mark.asyncio
 
+
+@pytest.fixture(autouse=True)
+def _stub_queue_recommendations(
+    stub_queue_recommendations,
+    mixed_recommendations_payload,
+):
+    stub_queue_recommendations(mixed_recommendations_payload)
+
 VALID_SIM_JSON = json.dumps(
     {
         "screens": [
@@ -204,8 +212,8 @@ async def test_happy_path(client, persona_fixture, text_content_fixture, monkeyp
 
     assert final["status"] == "DONE", final
     assert final["result"]["simulation"]["screens"][0]["narrative_text"] == "user reads ad"
-    assert len(final["result"]["recommendations"]) == 1
-    assert final["result"]["recommendations"][0]["evidence"]["circuit"] == "Attention"
+    rec_types = {rec["rec_type"] for rec in final["result"]["recommendations"]}
+    assert {"layout_flag", "memorability", "emotional_dropoff"} <= rec_types
 
 
 async def test_bad_persona(client, text_content_fixture):
@@ -440,6 +448,7 @@ async def test_analyze_populates_recommendations_via_mock(
     ui_screens_fixture,
     monkeypatch,
     sim_log_3_screens,
+    mixed_recommendations_payload,
 ):
     from backend.models.recommendations import Recommendations
 
@@ -450,25 +459,7 @@ async def test_analyze_populates_recommendations_via_mock(
         return None
 
     async def fake_generate_recommendations(*_args, **_kwargs) -> Recommendations:
-        return Recommendations.model_validate(
-            {
-                "recommendations": [
-                    {
-                        "rec_type": "copy_rewrite",
-                        "screen_index": 0,
-                        "evidence": {
-                            "circuit": "Attention",
-                            "region": "S_front_inf",
-                            "activation_score": 50.0,
-                            "score_rank": "Moderate",
-                        },
-                        "before": "old",
-                        "after": "new",
-                        "rationale": "Attention is moderate; shorter copy helps.",
-                    }
-                ]
-            }
-        )
+        return Recommendations.model_validate(mixed_recommendations_payload)
 
     _patch_surface_text_inference(monkeypatch)
     _patch_surface_atlas(monkeypatch)
@@ -483,8 +474,14 @@ async def test_analyze_populates_recommendations_via_mock(
     final = await _wait_for_terminal(client, response.json()["job_id"])
 
     assert final["status"] == "DONE", final
-    assert len(final["result"]["recommendations"]) == 1
-    assert final["result"]["recommendations"][0]["evidence"]["circuit"] == "Attention"
+    persisted = final["result"]["recommendations"]
+    rec_types = {rec["rec_type"] for rec in persisted}
+    assert {"layout_flag", "memorability", "emotional_dropoff"} <= rec_types
+    layout_flag = next(rec for rec in persisted if rec["rec_type"] == "layout_flag")
+    assert layout_flag["target_region"]["x_ratio"] == 0.15
+    assert layout_flag["element_description"] == "Subtitle reread"
+    assert next(rec for rec in persisted if rec["rec_type"] == "memorability")["screen_index"] == 1
+    assert next(rec for rec in persisted if rec["rec_type"] == "emotional_dropoff")["screen_index"] == 2
 
 
 async def test_legacy_test_inference_single_shot(client, monkeypatch, tmp_path):

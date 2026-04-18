@@ -51,31 +51,9 @@ async def client(tmp_path, monkeypatch) -> AsyncClient:
     async def fake_video_inference(_path: str) -> np.ndarray:
         return np.zeros((2, 8))
 
-    async def fake_generate_recommendations(*_args, **_kwargs) -> Recommendations:
-        return Recommendations.model_validate(
-            {
-                "recommendations": [
-                    {
-                        "rec_type": "copy_rewrite",
-                        "screen_index": 0,
-                        "evidence": {
-                            "circuit": "Attention",
-                            "region": "S_front_inf",
-                            "activation_score": 50.0,
-                            "score_rank": "Moderate",
-                        },
-                        "before": "old",
-                        "after": "new",
-                        "rationale": "Attention is moderate; shorter copy helps.",
-                    }
-                ]
-            }
-        )
-
     monkeypatch.setattr("backend.main.load_model", fake_load_model)
     monkeypatch.setattr(queue_manager, "run_tribev2_text", fake_text_inference)
     monkeypatch.setattr(queue_manager, "run_tribev2_video", fake_video_inference)
-    monkeypatch.setattr(queue_manager, "generate_recommendations", fake_generate_recommendations)
 
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -93,6 +71,66 @@ async def client(tmp_path, monkeypatch) -> AsyncClient:
 @pytest.fixture
 def client_factory():
     return client
+
+
+@pytest.fixture
+def mixed_recommendations_payload() -> dict[str, Any]:
+    return {
+        "recommendations": [
+            {
+                "rec_type": "layout_flag",
+                "screen_index": 0,
+                "evidence": {
+                    "circuit": "Cognitive Load",
+                    "region": "G_front_middle",
+                    "activation_score": 84.0,
+                    "score_rank": "Very High",
+                },
+                "target_region": {
+                    "x_ratio": 0.15,
+                    "y_ratio": 0.32,
+                    "width_ratio": 0.55,
+                    "height_ratio": 0.12,
+                },
+                "element_description": "Subtitle reread",
+                "rationale": "The reread pattern shows the screen is overloading working memory.",
+            },
+            {
+                "rec_type": "memorability",
+                "screen_index": 1,
+                "evidence": {
+                    "circuit": "Memory Encoding",
+                    "region": "G_oc-temp_med-Parahip",
+                    "activation_score": 18.0,
+                    "score_rank": "Low",
+                },
+                "rationale": "This screen is likely to be forgotten unless the value prop is isolated.",
+            },
+            {
+                "rec_type": "emotional_dropoff",
+                "screen_index": 2,
+                "evidence": {
+                    "circuit": "Emotional Response",
+                    "region": "S_cingul-Marginalis",
+                    "activation_score": 21.0,
+                    "score_rank": "Low",
+                },
+                "rationale": "Emotional engagement drops on pricing and needs a confidence repair.",
+            },
+        ]
+    }
+
+
+@pytest.fixture
+def stub_queue_recommendations(monkeypatch: pytest.MonkeyPatch):
+    def _install(payload: dict[str, Any]) -> dict[str, Any]:
+        async def fake_generate_recommendations(*_args, **_kwargs) -> Recommendations:
+            return Recommendations.model_validate(payload)
+
+        monkeypatch.setattr(queue_manager, "generate_recommendations", fake_generate_recommendations)
+        return payload
+
+    return _install
 
 
 @pytest.fixture

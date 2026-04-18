@@ -15,6 +15,14 @@ from tests.fixtures.sim_log_3_screens import sim_log_3_screens  # noqa: F401
 pytestmark = pytest.mark.asyncio
 
 
+@pytest.fixture(autouse=True)
+def _stub_queue_recommendations(
+    stub_queue_recommendations,
+    mixed_recommendations_payload,
+):
+    stub_queue_recommendations(mixed_recommendations_payload)
+
+
 def _patch_surface_text_inference(monkeypatch: pytest.MonkeyPatch) -> None:
     async def fake_text_inference(_text: str) -> np.ndarray:
         return np.ones((2, 20484))
@@ -260,7 +268,13 @@ class TestResultEnvelope:
         recommendations = final["result"]["recommendations"]
         assert isinstance(recommendations, list)
         assert recommendations
-        assert recommendations[0]["evidence"]["circuit"] == "Attention"
+        rec_types = {rec["rec_type"] for rec in recommendations}
+        assert {"layout_flag", "memorability", "emotional_dropoff"} <= rec_types
+        layout_flag = next(rec for rec in recommendations if rec["rec_type"] == "layout_flag")
+        assert layout_flag["target_region"]["x_ratio"] == 0.15
+        assert layout_flag["element_description"] == "Subtitle reread"
+        assert next(rec for rec in recommendations if rec["rec_type"] == "memorability")["screen_index"] == 1
+        assert next(rec for rec in recommendations if rec["rec_type"] == "emotional_dropoff")["screen_index"] == 2
 
     async def test_stage_progression_caplog(
         self,

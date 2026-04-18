@@ -59,6 +59,56 @@ def valid_rec_response_json() -> str:
 
 
 @pytest.fixture
+def mixed_rec_response_json() -> str:
+    return json.dumps(
+        {
+            "recommendations": [
+                {
+                    "rec_type": "layout_flag",
+                    "screen_index": 0,
+                    "evidence": {
+                        "circuit": "Cognitive Load",
+                        "region": "G_front_middle",
+                        "activation_score": 84.0,
+                        "score_rank": "Very High",
+                    },
+                    "target_region": {
+                        "x_ratio": 0.15,
+                        "y_ratio": 0.32,
+                        "width_ratio": 0.55,
+                        "height_ratio": 0.12,
+                    },
+                    "element_description": "Subtitle reread",
+                    "rationale": "The reread pattern signals cognitive overload on this screen.",
+                },
+                {
+                    "rec_type": "memorability",
+                    "screen_index": 1,
+                    "evidence": {
+                        "circuit": "Memory Encoding",
+                        "region": "G_oc-temp_med-Parahip",
+                        "activation_score": 18.0,
+                        "score_rank": "Low",
+                    },
+                    "rationale": "This screen is likely to be forgotten unless the value prop is isolated.",
+                },
+                {
+                    "rec_type": "emotional_dropoff",
+                    "screen_index": 2,
+                    "evidence": {
+                        "circuit": "Emotional Response",
+                        "region": "S_cingul-Marginalis",
+                        "activation_score": 21.0,
+                        "score_rank": "Low",
+                    },
+                    "rationale": "Emotional engagement drops on pricing and needs a confidence repair.",
+                },
+            ]
+        }
+    )
+
+
+@pytest.fixture
 def respx_mock():
     with respx.mock(assert_all_called=False) as router:
         yield router
@@ -94,6 +144,107 @@ class TestGenerateRecommendationsHappyPath:
         )
         assert len(result.recommendations) == 1
         assert result.recommendations[0].evidence.activation_score == 50.0
+
+    async def test_mixed_response_types_parse_through(
+        self,
+        respx_mock,
+        mixed_rec_response_json: str,
+        sim_log_3_screens,
+        persona_model_fixture: PersonaRead,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        from backend.core.config import settings
+        from backend.services.recommendations import generate_recommendations
+
+        trigger_heavy_roi = [
+            {
+                "screen_index": 0,
+                "circuits": {
+                    "Attention": {"score": 58.0, "peak": 63.0},
+                    "Cognitive Load": {"score": 84.0, "peak": 90.0},
+                    "Emotional Response": {"score": 63.0, "peak": 70.0},
+                    "Memory Encoding": {"score": 52.0, "peak": 58.0},
+                    "Reward": {"score": 24.0, "peak": 30.0},
+                },
+                "regions": [
+                    {
+                        "atlas_label": "G_front_middle",
+                        "circuit": "Cognitive Load",
+                        "score": 84.0,
+                        "peak": 90.0,
+                    }
+                ],
+            },
+            {
+                "screen_index": 1,
+                "circuits": {
+                    "Attention": {"score": 42.0, "peak": 48.0},
+                    "Cognitive Load": {"score": 51.0, "peak": 59.0},
+                    "Emotional Response": {"score": 39.0, "peak": 45.0},
+                    "Memory Encoding": {"score": 18.0, "peak": 26.0},
+                    "Reward": {"score": 34.0, "peak": 40.0},
+                },
+                "regions": [
+                    {
+                        "atlas_label": "G_oc-temp_med-Parahip",
+                        "circuit": "Memory Encoding",
+                        "score": 18.0,
+                        "peak": 26.0,
+                    }
+                ],
+            },
+            {
+                "screen_index": 2,
+                "circuits": {
+                    "Attention": {"score": 36.0, "peak": 42.0},
+                    "Cognitive Load": {"score": 60.0, "peak": 67.0},
+                    "Emotional Response": {"score": 21.0, "peak": 30.0},
+                    "Memory Encoding": {"score": 28.0, "peak": 34.0},
+                    "Reward": {"score": 19.0, "peak": 25.0},
+                },
+                "regions": [
+                    {
+                        "atlas_label": "S_cingul-Marginalis",
+                        "circuit": "Emotional Response",
+                        "score": 21.0,
+                        "peak": 30.0,
+                    }
+                ],
+            },
+        ]
+        trigger_heavy_flow = {
+            "circuits": {
+                "Emotional Response": {
+                    "per_screen": [
+                        {"screen_index": 0, "score_0_100": 63.0, "delta_from_prev": 0.0},
+                        {"screen_index": 1, "score_0_100": 39.0, "delta_from_prev": -24.0},
+                        {"screen_index": 2, "score_0_100": 21.0, "delta_from_prev": -18.0},
+                    ],
+                    "trend": "dropping",
+                }
+            }
+        }
+
+        monkeypatch.setattr(settings, "deepseek_api_key", "deepseek-test")
+        respx_mock.post("https://api.deepseek.com/chat/completions").mock(
+            return_value=httpx.Response(
+                200,
+                json={"choices": [{"message": {"content": mixed_rec_response_json}}]},
+            )
+        )
+
+        result = await generate_recommendations(
+            persona_model_fixture,
+            sim_log_3_screens,
+            trigger_heavy_roi,
+            trigger_heavy_flow,
+        )
+
+        rec_types = {rec.rec_type for rec in result.recommendations}
+        assert {"layout_flag", "memorability", "emotional_dropoff"} <= rec_types
+        layout_flag = next(rec for rec in result.recommendations if rec.rec_type == "layout_flag")
+        assert layout_flag.target_region is not None
+        assert layout_flag.element_description == "Subtitle reread"
 
 
 class TestGenerateRecommendationsRepairRetry:
