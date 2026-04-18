@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from backend.models.simulation import TargetRegion
 
@@ -49,6 +49,19 @@ class Recommendation(BaseModel):
     before: str | None = None
     after: str | None = None
     rationale: str = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def validate_rec_type_fields(self) -> "Recommendation":
+        if self.rec_type != "layout_flag":
+            return self
+
+        has_target_region = self.target_region is not None
+        has_element_description = bool(self.element_description and self.element_description.strip())
+        if not has_target_region and not has_element_description:
+            raise ValueError(
+                "layout_flag recommendations must include target_region and/or element_description"
+            )
+        return self
 
 
 class Recommendations(BaseModel):

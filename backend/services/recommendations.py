@@ -14,8 +14,14 @@ from typing import Any
 from pydantic import BaseModel
 
 from backend.models.recommendations import Recommendations
-from backend.models.simulation import DeepSeekClientError, SchemaValidationFailure
+from backend.models.simulation import DeepSeekClientError, SchemaValidationFailure, SimulationLog
 from backend.services.deepseek_client import SANITIZED_ERROR, deepseek_text_completion
+
+LAYOUT_FLAG_COGNITIVE_LOAD_MIN = 70.0
+LAYOUT_FLAG_REWARD_MAX = 35.0
+MEMORABILITY_MEMORY_ENCODING_MAX = 25.0
+EMOTIONAL_DROPOFF_DELTA_MAX = -15.0
+EMOTIONAL_DROPOFF_SCORE_MAX = 35.0
 
 REC_SYSTEM_PROMPT = """You are a UX design critic that grounds every recommendation in measured brain circuit activation scores. You receive a persona, a session simulation log, per-screen ROI activation scores (0-100, covering 5 named circuits: Attention, Cognitive Load, Emotional Response, Memory Encoding, Reward), and a flow-level continuity trajectory.
 
@@ -61,6 +67,200 @@ def _normalize_payload(payload: Any) -> dict[str, Any]:
     raise TypeError(f"Unsupported payload type: {type(payload).__name__}")
 
 
+def _target_region_key(target_region: Any) -> tuple[float, float, float, float] | None:
+    if target_region is None:
+        return None
+
+    payload = target_region.model_dump() if hasattr(target_region, "model_dump") else target_region
+    if not isinstance(payload, dict):
+        return None
+
+    return (
+        float(payload["x_ratio"]),
+        float(payload["y_ratio"]),
+        float(payload["width_ratio"]),
+        float(payload["height_ratio"]),
+    )
+
+
+def _screen_roi_map(roi_per_screen: list[dict[str, Any]]) -> dict[int, dict[str, Any]]:
+    return {int(screen_bundle["screen_index"]): screen_bundle for screen_bundle in roi_per_screen}
+
+
+def _circuit_score(screen_bundle: dict[str, Any], circuit_name: str) -> float | None:
+    circuits = screen_bundle.get("circuits", {})
+    circuit_payload = circuits.get(circuit_name)
+    if not isinstance(circuit_payload, dict):
+        return None
+
+    score = circuit_payload.get("score")
+    return float(score) if score is not None else None
+
+
+def _normalized_text(value: str | None) -> str | None:
+    if value is None:
+        return None
+
+    normalized = value.strip().lower()
+    return normalized or None
+
+
+def _required_layout_flag_screens(
+    sim_log: SimulationLog,
+    roi_by_screen: dict[int, dict[str, Any]],
+) -> set[int]:
+    required: set[int] = set()
+    for screen in sim_log.screens:
+        screen_bundle = roi_by_screen.get(screen.screen_index)
+        if screen_bundle is None or not screen.events:
+            continue
+
+        has_identifier = any(
+            event.target_region is not None or _normalized_text(event.note) is not None
+            for event in screen.events
+        )
+        cognitive_load_score = _circuit_score(screen_bundle, "Cognitive Load")
+        reward_score = _circuit_score(screen_bundle, "Reward")
+        if (
+            has_identifier
+            and cognitive_load_score is not None
+            and reward_score is not None
+            and cognitive_load_score >= LAYOUT_FLAG_COGNITIVE_LOAD_MIN
+            and reward_score <= LAYOUT_FLAG_REWARD_MAX
+        ):
+            required.add(screen.screen_index)
+    return required
+
+
+def _required_memorability_screens(
+    sim_log: SimulationLog,
+    roi_by_screen: dict[int, dict[str, Any]],
+) -> set[int]:
+    required: set[int] = set()
+    for screen in sim_log.screens:
+        screen_bundle = roi_by_screen.get(screen.screen_index)
+        if screen_bundle is None:
+            continue
+
+        memory_score = _circuit_score(screen_bundle, "Memory Encoding")
+        if memory_score is not None and memory_score <= MEMORABILITY_MEMORY_ENCODING_MAX:
+            required.add(screen.screen_index)
+            continue
+
+        if _normalized_text(screen.memorability_hypothesis) == "low":
+            required.add(screen.screen_index)
+    return required
+
+
+def _required_emotional_dropoff_screens(
+    roi_by_screen: dict[int, dict[str, Any]],
+    flow_continuity: dict[str, Any],
+) -> set[int]:
+    required: set[int] = set()
+    circuits = flow_continuity.get("circuits", {})
+    emotional_payload = circuits.get("Emotional Response")
+    if not isinstance(emotional_payload, dict):
+        return required
+
+    for point in emotional_payload.get("per_screen", []):
+        if not isinstance(point, dict):
+            continue
+        screen_index = int(point["screen_index"])
+        delta = float(point.get("delta_from_prev", 0.0))
+        emotional_score = _circuit_score(
+            roi_by_screen.get(screen_index, {}),
+            "Emotional Response",
+        )
+        if delta <= EMOTIONAL_DROPOFF_DELTA_MAX and (
+            emotional_score is None or emotional_score <= EMOTIONAL_DROPOFF_SCORE_MAX
+        ):
+            required.add(screen_index)
+    return required
+
+
+def _layout_flag_matches_simulation_event(rec: Any, sim_log: SimulationLog) -> bool:
+    screen = next((screen for screen in sim_log.screens if screen.screen_index == rec.screen_index), None)
+    if screen is None:
+        return False
+
+    event_regions = {
+        region_key
+        for region_key in (_target_region_key(event.target_region) for event in screen.events)
+        if region_key is not None
+    }
+    event_notes = {
+        note
+        for note in (_normalized_text(event.note) for event in screen.events)
+        if note is not None
+    }
+
+    rec_target_region = _target_region_key(rec.target_region)
+    rec_element_description = _normalized_text(rec.element_description)
+    return (
+        rec_target_region is not None
+        and rec_target_region in event_regions
+    ) or (
+        rec_element_description is not None
+        and rec_element_description in event_notes
+    )
+
+
+def validate_behavioral_coverage(
+    sim_log: SimulationLog,
+    roi_per_screen: list[dict[str, Any]],
+    flow_continuity: dict[str, Any],
+    recommendations: Recommendations,
+) -> None:
+    roi_by_screen = _screen_roi_map(roi_per_screen)
+    screen_indexes = {screen.screen_index for screen in sim_log.screens}
+    missing_coverage: list[str] = []
+
+    for rec in recommendations.recommendations:
+        if rec.screen_index not in screen_indexes or rec.screen_index not in roi_by_screen:
+            raise ValueError(
+                f"Recommendation references missing screen_index {rec.screen_index}"
+            )
+
+        if rec.rec_type == "layout_flag" and not _layout_flag_matches_simulation_event(rec, sim_log):
+            raise ValueError(
+                "layout_flag recommendations must preserve simulation-derived target_region "
+                "and/or element_description"
+            )
+
+        if rec.rec_type == "memorability" and rec.evidence.circuit != "Memory Encoding":
+            raise ValueError("memorability recommendations must cite Memory Encoding evidence")
+
+        if rec.rec_type == "emotional_dropoff" and rec.evidence.circuit != "Emotional Response":
+            raise ValueError("emotional_dropoff recommendations must cite Emotional Response evidence")
+
+    for screen_index in _required_layout_flag_screens(sim_log, roi_by_screen):
+        if not any(
+            rec.rec_type == "layout_flag" and rec.screen_index == screen_index
+            for rec in recommendations.recommendations
+        ):
+            missing_coverage.append(f"layout_flag@screen_{screen_index}")
+
+    for screen_index in _required_memorability_screens(sim_log, roi_by_screen):
+        if not any(
+            rec.rec_type == "memorability" and rec.screen_index == screen_index
+            for rec in recommendations.recommendations
+        ):
+            missing_coverage.append(f"memorability@screen_{screen_index}")
+
+    for screen_index in _required_emotional_dropoff_screens(roi_by_screen, flow_continuity):
+        if not any(
+            rec.rec_type == "emotional_dropoff" and rec.screen_index == screen_index
+            for rec in recommendations.recommendations
+        ):
+            missing_coverage.append(f"emotional_dropoff@screen_{screen_index}")
+
+    if missing_coverage:
+        raise ValueError(
+            "Recommendation bundle missing required behavioral coverage: "
+            + ", ".join(missing_coverage)
+        )
+
+
 def build_rec_user_prompt(
     persona: dict[str, Any],
     sim_log: dict[str, Any],
@@ -95,11 +295,13 @@ async def generate_recommendations(
     temperature: float = 0.6,
 ) -> Recommendations:
     """Return a validated recommendations bundle from the DeepSeek text path."""
+    normalized_sim_log = SimulationLog.model_validate(_normalize_payload(sim_log))
+    normalized_flow_continuity = _normalize_payload(flow_continuity)
     user_prompt = build_rec_user_prompt(
         _normalize_persona(persona),
-        _normalize_payload(sim_log),
+        normalized_sim_log.model_dump(),
         roi_per_screen,
-        _normalize_payload(flow_continuity),
+        normalized_flow_continuity,
     )
 
     try:
@@ -110,7 +312,16 @@ async def generate_recommendations(
             max_tokens=max_tokens,
             temperature=temperature,
         )
-    except (DeepSeekClientError, SchemaValidationFailure) as exc:
+        recommendations = (
+            result if isinstance(result, Recommendations) else Recommendations.model_validate(result)
+        )
+        validate_behavioral_coverage(
+            normalized_sim_log,
+            roi_per_screen,
+            normalized_flow_continuity,
+            recommendations,
+        )
+    except (DeepSeekClientError, SchemaValidationFailure, ValueError) as exc:
         raise DeepSeekClientError(SANITIZED_ERROR) from exc
 
-    return result if isinstance(result, Recommendations) else Recommendations.model_validate(result)
+    return recommendations
