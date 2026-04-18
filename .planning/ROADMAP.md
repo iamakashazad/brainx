@@ -9,7 +9,7 @@ BrainX is built in strict pipeline order: the backend foundation and TRIBEv2 int
 - [x] **Phase 1: Foundation and TRIBEv2 Integration** - Backend skeleton, TRIBEv2 environment, single-worker GPU queue, and both input path validations
 - [x] **Phase 2: Simulation Pipeline and Content Input** - DeepSeek simulation service, all content input types, persona builder, and simulation output validation
 - [x] **Phase 3: Full Pipeline Integration and Recommendations** - End-to-end pipeline from content + persona to brain maps and grounded copy recommendations
-- [ ] **Phase 3.1: Runtime Fallback Wiring and Pathway Closure** - Wire the slideshow/video fallback into the shared analyze flow and prove SIM-03 in the shipped runtime path
+- [x] **Phase 3.1: Runtime Fallback Wiring and Pathway Closure** - Wire the slideshow/video fallback into the shared analyze flow and prove SIM-03 in the shipped runtime path (completed 2026-04-18)
 - [ ] **Phase 3.2: Verification and Traceability Reconciliation** - Create the missing Phase 2 verification, refresh stale audit artifacts, and reconcile requirement traceability before re-audit
 - [ ] **Phase 4: Frontend — Upload, Persona, and Results** - Complete React frontend with 3D brain visualization, persona form, upload flow, and results view
 - [ ] **Phase 5: Session Persistence, Demo, and Polish** - Session history, re-loadable results, pre-built demo case study, and production hardening
@@ -62,8 +62,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 03.1-01: Wire pathway selection and slideshow/video fallback into the shared analyze worker
-- [ ] 03.1-02: Add runtime regression coverage and verification evidence for fallback activation in `/analyze`
+- [x] 03.1-01: Wire pathway selection and slideshow/video fallback into the shared analyze worker
+- [x] 03.1-02: Add runtime regression coverage and verification evidence for fallback activation in `/analyze`
 
 ### Phase 3.2: Verification and Traceability Reconciliation
 **Goal**: Phase 2 has formal verification, stale Phase 1 and planning artifacts are reconciled, and the milestone can be re-audited against current evidence without orphaned requirements
@@ -106,7 +106,7 @@ Plans:
 | 1. Foundation and TRIBEv2 Integration | 4/4 | Complete | 2026-04-13 |
 | 2. Simulation Pipeline and Content Input | 5/5 | Complete | 2026-04-16 |
 | 3. Full Pipeline Integration and Recommendations | 5/5 | Complete | 2026-04-18 |
-| 3.1. Runtime Fallback Wiring and Pathway Closure | 0/2 | Not started | - |
+| 3.1. Runtime Fallback Wiring and Pathway Closure | 2/2 | Complete    | 2026-04-18 |
 | 3.2. Verification and Traceability Reconciliation | 0/3 | Not started | - |
 | 4. Frontend — Upload, Persona, and Results | 0/3 | Not started | - |
 | 5. Session Persistence, Demo, and Polish | 0/3 | Not started | - |
