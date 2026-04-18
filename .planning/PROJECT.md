@@ -12,7 +12,8 @@ The only tool that simulates real-world usage context before measuring brain res
 
 ### Validated
 
-(None yet — ship to validate)
+- `SIM-03` — video slideshow fallback is now proven in the shipped `/analyze` runtime flow and no longer exists only in isolated services/tests.
+  Validated in Phase 3.1: Runtime Fallback Wiring and Pathway Closure
 
 ### Active
 
@@ -67,6 +68,7 @@ The only tool that simulates real-world usage context before measuring brain res
 - TRIBEv2 is Meta's open-source brain prediction model (https://github.com/facebookresearch/tribev2). It is non-commercial licensed. The strategy is: use it for research preview and audience building now, then swap the brain model engine for a commercial-friendly alternative when ready to monetize.
 - GPT-4o powers the persona simulator — it interprets the persona definition + environment and generates a realistic usage session that becomes the actual input to TRIBEv2.
 - TRIBEv2 runs locally on user's GPU for inference. No cloud dependency in v1.
+- Current backend state: Phase 3.1 is complete, and the shared `/analyze` worker can now activate the slideshow/video fallback path for eligible visual content while preserving the existing per-screen pipeline contract.
 - The "interpretation layer" (recommendations engine) sits on top of TRIBEv2 output and translates activation maps into actionable design and copy changes. This layer is the defensible IP — it is model-agnostic and will survive a model swap.
 - Content scope for MVP: UI screens (design flows) + static content (ads, social images, text). Video is deferred to v2.
 - Primary audience: designers, marketers, content creators. Research preview builds credibility before commercial product launch.
@@ -106,4 +108,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-06 after initialization*
+*Last updated: 2026-04-18 after Phase 3.1 completion*
