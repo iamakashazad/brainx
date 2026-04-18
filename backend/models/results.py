@@ -36,6 +36,12 @@ class ScreenROI(BaseModel):
     regions: list[RegionScoreEntry] = Field(default_factory=list)
 
 
+class PathwayMetadata(BaseModel):
+    selected_pathway: Literal["text", "video"]
+    slideshow_path: str | None = None
+    durations: list[float] = Field(default_factory=list)
+
+
 class AnalysisResult(BaseModel):
     """Stable Phase 3 analyze result envelope.
 
@@ -51,3 +57,4 @@ class AnalysisResult(BaseModel):
     roi: list[ScreenROI] = Field(default_factory=list)
     flow_continuity: FlowContinuity
     recommendations: list[dict[str, Any]] = Field(default_factory=list)
+    pathway: PathwayMetadata
