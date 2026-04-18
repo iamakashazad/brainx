@@ -92,15 +92,15 @@
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | INFRA-01 | Phase 1 | Pending |
-| INFRA-02 | Phase 7 | Pending |
+| INFRA-02 | Phase 3.2 | Pending |
 | INFRA-03 | Phase 1 | Pending |
-| SIM-01 | Phase 7 | Pending |
-| SIM-03 | Phase 6 | Pending |
-| SIM-02 | Phase 7 | Pending |
-| SIM-04 | Phase 7 | Pending |
-| CONT-01 | Phase 7 | Pending |
-| CONT-02 | Phase 7 | Pending |
-| CONT-03 | Phase 7 | Pending |
+| SIM-01 | Phase 3.2 | Pending |
+| SIM-03 | Phase 3.1 | Pending |
+| SIM-02 | Phase 3.2 | Pending |
+| SIM-04 | Phase 3.2 | Pending |
+| CONT-01 | Phase 3.2 | Pending |
+| CONT-02 | Phase 3.2 | Pending |
+| CONT-03 | Phase 3.2 | Pending |
 | BRAIN-01 | Phase 3 | Pending |
 | BRAIN-02 | Phase 3 | Pending |
 | BRAIN-03 | Phase 3 | Pending |
@@ -109,10 +109,10 @@
 | REC-02 | Phase 3 | Pending |
 | REC-03 | Phase 3 | Pending |
 | REC-04 | Phase 3 | Pending |
-| PERS-01 | Phase 7 | Pending |
-| PERS-02 | Phase 7 | Pending |
-| PERS-03 | Phase 7 | Pending |
-| PERS-04 | Phase 7 | Pending |
+| PERS-01 | Phase 3.2 | Pending |
+| PERS-02 | Phase 3.2 | Pending |
+| PERS-03 | Phase 3.2 | Pending |
+| PERS-04 | Phase 3.2 | Pending |
 | FE-01 | Phase 4 | Pending |
 | FE-02 | Phase 4 | Pending |
 | FE-03 | Phase 5 | Pending |

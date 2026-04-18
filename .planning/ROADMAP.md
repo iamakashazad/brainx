@@ -9,10 +9,10 @@ BrainX is built in strict pipeline order: the backend foundation and TRIBEv2 int
 - [x] **Phase 1: Foundation and TRIBEv2 Integration** - Backend skeleton, TRIBEv2 environment, single-worker GPU queue, and both input path validations
 - [x] **Phase 2: Simulation Pipeline and Content Input** - DeepSeek simulation service, all content input types, persona builder, and simulation output validation
 - [x] **Phase 3: Full Pipeline Integration and Recommendations** - End-to-end pipeline from content + persona to brain maps and grounded copy recommendations
+- [ ] **Phase 3.1: Runtime Fallback Wiring and Pathway Closure** - Wire the slideshow/video fallback into the shared analyze flow and prove SIM-03 in the shipped runtime path
+- [ ] **Phase 3.2: Verification and Traceability Reconciliation** - Create the missing Phase 2 verification, refresh stale audit artifacts, and reconcile requirement traceability before re-audit
 - [ ] **Phase 4: Frontend — Upload, Persona, and Results** - Complete React frontend with 3D brain visualization, persona form, upload flow, and results view
 - [ ] **Phase 5: Session Persistence, Demo, and Polish** - Session history, re-loadable results, pre-built demo case study, and production hardening
-- [ ] **Phase 6: Runtime Fallback Wiring and Pathway Closure** - Wire the slideshow/video fallback into the shared analyze flow and prove SIM-03 in the shipped runtime path
-- [ ] **Phase 7: Verification and Traceability Reconciliation** - Create the missing Phase 2 verification, refresh stale audit artifacts, and reconcile requirement traceability before re-audit
 
 ## Phase Details
 
@@ -54,9 +54,32 @@ Plans:
 - [x] 03-04: Gap closure for `layout_flag`, `memorability`, and `emotional_dropoff` behavior
 - [x] 03-05: Live blind-eval closure with passing proof artifact
 
+### Phase 3.1: Runtime Fallback Wiring and Pathway Closure
+**Goal**: The shipped `/analyze` pipeline can switch into the slideshow/video fallback path when required, and SIM-03 is proven in the real runtime flow rather than only in isolated services/tests
+**Depends on**: Phase 3
+**Requirements**: SIM-03
+**Gap Closure**: Closes the v1.0 milestone audit integration and broken-flow gaps for the automatic slideshow fallback path
+**Plans**: 2 plans
+
+Plans:
+- [ ] 03.1-01: Wire pathway selection and slideshow/video fallback into the shared analyze worker
+- [ ] 03.1-02: Add runtime regression coverage and verification evidence for fallback activation in `/analyze`
+
+### Phase 3.2: Verification and Traceability Reconciliation
+**Goal**: Phase 2 has formal verification, stale Phase 1 and planning artifacts are reconciled, and the milestone can be re-audited against current evidence without orphaned requirements
+**Depends on**: Phase 3.1
+**Requirements**: INFRA-02, SIM-01, SIM-02, SIM-04, CONT-01, CONT-02, CONT-03, PERS-01, PERS-02, PERS-03, PERS-04
+**Gap Closure**: Closes the v1.0 milestone audit requirement-orphan and documentation-drift gaps
+**Plans**: 3 plans
+
+Plans:
+- [ ] 03.2-01: Create `02-VERIFICATION.md` from shipped Phase 2 code, tests, and UAT evidence
+- [ ] 03.2-02: Refresh stale Phase 1 verification/UAT artifacts and reconcile `REQUIREMENTS.md` traceability
+- [ ] 03.2-03: Re-run milestone audit and confirm clean closure evidence
+
 ### Phase 4: Frontend — Upload, Persona, and Results
 **Goal**: Users can submit an analysis through a complete React UI and view brain activation maps alongside grounded recommendations in a single results panel
-**Depends on**: Phase 3
+**Depends on**: Phase 3.2
 **Requirements**: FE-01, FE-02
 **Plans**: 3 plans
 
@@ -76,29 +99,6 @@ Plans:
 - [ ] 05-02: Pre-built demo case study backed by real stored analysis data
 - [ ] 05-03: Production hardening — timeout watchdog, queue depth guard, UI label audit
 
-### Phase 6: Runtime Fallback Wiring and Pathway Closure
-**Goal**: The shipped `/analyze` pipeline can switch into the slideshow/video fallback path when required, and SIM-03 is proven in the real runtime flow rather than only in isolated services/tests
-**Depends on**: Phase 3
-**Requirements**: SIM-03
-**Gap Closure**: Closes the v1.0 milestone audit integration and broken-flow gaps for the automatic slideshow fallback path
-**Plans**: 2 plans
-
-Plans:
-- [ ] 06-01: Wire pathway selection and slideshow/video fallback into the shared analyze worker
-- [ ] 06-02: Add runtime regression coverage and verification evidence for fallback activation in `/analyze`
-
-### Phase 7: Verification and Traceability Reconciliation
-**Goal**: Phase 2 has formal verification, stale Phase 1 and planning artifacts are reconciled, and the milestone can be re-audited against current evidence without orphaned requirements
-**Depends on**: Phase 6
-**Requirements**: INFRA-02, SIM-01, SIM-02, SIM-04, CONT-01, CONT-02, CONT-03, PERS-01, PERS-02, PERS-03, PERS-04
-**Gap Closure**: Closes the v1.0 milestone audit requirement-orphan and documentation-drift gaps
-**Plans**: 3 plans
-
-Plans:
-- [ ] 07-01: Create `02-VERIFICATION.md` from shipped Phase 2 code, tests, and UAT evidence
-- [ ] 07-02: Refresh stale Phase 1 verification/UAT artifacts and reconcile `REQUIREMENTS.md` traceability
-- [ ] 07-03: Re-run milestone audit and confirm clean closure evidence
-
 ## Progress
 
 | Phase | Plans Complete | Status | Completed |
@@ -106,7 +106,7 @@ Plans:
 | 1. Foundation and TRIBEv2 Integration | 4/4 | Complete | 2026-04-13 |
 | 2. Simulation Pipeline and Content Input | 5/5 | Complete | 2026-04-16 |
 | 3. Full Pipeline Integration and Recommendations | 5/5 | Complete | 2026-04-18 |
+| 3.1. Runtime Fallback Wiring and Pathway Closure | 0/2 | Not started | - |
+| 3.2. Verification and Traceability Reconciliation | 0/3 | Not started | - |
 | 4. Frontend — Upload, Persona, and Results | 0/3 | Not started | - |
 | 5. Session Persistence, Demo, and Polish | 0/3 | Not started | - |
-| 6. Runtime Fallback Wiring and Pathway Closure | 0/2 | Not started | - |
-| 7. Verification and Traceability Reconciliation | 0/3 | Not started | - |
