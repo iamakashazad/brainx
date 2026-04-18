@@ -200,12 +200,19 @@ async def _wait_for_terminal(client, job_id: str, max_iters: int = 60):
     raise AssertionError(f"job {job_id} did not complete: {body}")
 
 
-async def test_happy_path(client, persona_fixture, text_content_fixture, monkeypatch):
+async def test_analyze_keeps_text_path_for_text_content_when_video_is_default(
+    client,
+    persona_fixture,
+    text_content_fixture,
+    monkeypatch,
+):
     from backend.core.config import settings
 
     monkeypatch.setattr(settings, "deepseek_api_key", "deepseek-test")
     set_default_pathway("video")
     _patch_surface_text_inference(monkeypatch)
+    fake_video_inference = AsyncMock(side_effect=AssertionError("video path should not run"))
+    monkeypatch.setattr("backend.core.queue.run_tribev2_video", fake_video_inference)
     _patch_surface_atlas(monkeypatch)
     with respx.mock(assert_all_called=False) as router:
         router.post("https://api.deepseek.com/chat/completions").mock(
@@ -231,6 +238,7 @@ async def test_happy_path(client, persona_fixture, text_content_fixture, monkeyp
 
     assert final["status"] == "DONE", final
     assert final["result"]["simulation"]["screens"][0]["narrative_text"] == "user reads ad"
+    assert fake_video_inference.await_count == 0
     assert final["result"]["pathway"]["selected_pathway"] == "text"
     assert final["result"]["pathway"]["slideshow_path"] is None
     assert final["result"]["pathway"]["durations"] == []
@@ -521,7 +529,7 @@ async def test_legacy_test_inference_single_shot(client, monkeypatch, tmp_path):
     assert not (tmp_path / "activations" / response.json()["job_id"] / "screen_2.npy").exists()
 
 
-async def test_visual_analyze_uses_video_fallback_when_default_pathway_is_video(
+async def test_analyze_uses_video_fallback_for_ui_screens(
     client,
     persona_fixture,
     ui_screens_fixture,
@@ -572,6 +580,9 @@ async def test_visual_analyze_uses_video_fallback_when_default_pathway_is_video(
     assert final["status"] == "DONE", final
     assert fake_video_inference.await_count == 1
     assert fake_text_inference.await_count == 0
+    assert fake_video_inference.await_args.args == (
+        f"activations/{response.json()['job_id']}/fallback_slideshow.mp4",
+    )
     assert final["result"]["pathway"] == {
         "selected_pathway": "video",
         "slideshow_path": f"activations/{response.json()['job_id']}/fallback_slideshow.mp4",
@@ -587,7 +598,7 @@ async def test_visual_analyze_uses_video_fallback_when_default_pathway_is_video(
     set_default_pathway("text")
 
 
-async def test_video_fallback_errors_when_activation_is_too_short(
+async def test_analyze_video_fallback_split_failure_errors(
     client,
     persona_fixture,
     ui_screens_fixture,
@@ -632,4 +643,5 @@ async def test_video_fallback_errors_when_activation_is_too_short(
 
     assert final["status"] == "ERROR"
     assert "at least one timestep per screen" in final["error"]
+    assert not final.get("result")
     set_default_pathway("text")
