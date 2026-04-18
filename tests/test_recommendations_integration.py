@@ -556,6 +556,49 @@ class TestGenerateRecommendationsRepairRetry:
 
 
 class TestGenerateRecommendationsErrorSanitization:
+    async def test_invalid_activation_score_raises_sanitized(
+        self,
+        sim_log_3_screens,
+        persona_model_fixture: PersonaRead,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        from backend.models.recommendations import Recommendations
+        from backend.models.simulation import DeepSeekClientError
+        from backend.services.recommendations import generate_recommendations
+
+        invalid_score_bundle = Recommendations.model_validate(
+            {
+                "recommendations": [
+                    {
+                        "rec_type": "copy_rewrite",
+                        "screen_index": 0,
+                        "evidence": {
+                            "circuit": "Attention",
+                            "region": "S_front_inf",
+                            "activation_score": 88.0,
+                            "score_rank": "Very High",
+                        },
+                        "before": "Welcome to our product",
+                        "after": "Get started in 30 seconds",
+                        "rationale": "Shorter copy reduces friction.",
+                    }
+                ]
+            }
+        )
+
+        async def fake_completion(**_kwargs):
+            return invalid_score_bundle
+
+        monkeypatch.setattr("backend.services.recommendations.deepseek_text_completion", fake_completion)
+
+        with pytest.raises(DeepSeekClientError):
+            await generate_recommendations(
+                persona_model_fixture,
+                sim_log_3_screens,
+                _roi(),
+                _flow(),
+            )
+
     async def test_api_key_not_in_error(
         self,
         respx_mock,

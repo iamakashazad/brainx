@@ -177,7 +177,7 @@ def aggregate_screen_roi(
 
 def _rescale_value(value: float, min_score: float, max_score: float) -> float:
     if max_score == min_score:
-        return 100.0
+        return 0.0
     return ((value - min_score) / (max_score - min_score)) * 100.0
 
 

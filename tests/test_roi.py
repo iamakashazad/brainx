@@ -253,3 +253,29 @@ class TestRescale:
         assert scaled[1]["circuits"]["Attention"]["score"] == pytest.approx(
             (2.5 - (-2.0)) / (7.0 - (-2.0)) * 100.0
         )
+
+    def test_flat_bundle_normalizes_to_zero(self) -> None:
+        bundles = [
+            {
+                "circuits": {
+                    "Attention": {"score": 0.0, "peak": 0.0},
+                    "Cognitive Load": {"score": 0.0, "peak": 0.0},
+                    "Emotional Response": {"score": 0.0, "peak": 0.0},
+                    "Memory Encoding": {"score": 0.0, "peak": 0.0},
+                    "Reward": {"score": 0.0, "peak": 0.0},
+                },
+                "regions": [
+                    {
+                        "atlas_label": "S_front_inf",
+                        "circuit": "Attention",
+                        "score": 0.0,
+                        "peak": 0.0,
+                    }
+                ],
+            }
+        ]
+
+        scaled = rescale_to_0_100(bundles)
+        assert scaled[0]["circuits"]["Attention"]["score"] == 0.0
+        assert scaled[0]["circuits"]["Reward"]["peak"] == 0.0
+        assert scaled[0]["regions"][0]["score"] == 0.0

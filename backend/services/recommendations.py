@@ -13,7 +13,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from backend.models.recommendations import Recommendations
+from backend.models.recommendations import Recommendations, rank_score
 from backend.models.simulation import DeepSeekClientError, SchemaValidationFailure, SimulationLog
 from backend.services.deepseek_client import SANITIZED_ERROR, deepseek_text_completion
 from backend.services.roi_aggregation import ROI_CIRCUIT_MAP
@@ -115,6 +115,24 @@ def _screen_region_options(screen_bundle: dict[str, Any], circuit_name: str) -> 
         if row.get("circuit") == circuit_name and isinstance(atlas_label, str) and atlas_label in valid_regions:
             screen_regions.append(atlas_label)
     return screen_regions
+
+
+def _allowed_roi_scores(roi_per_screen: list[dict[str, Any]]) -> set[float]:
+    allowed_scores: set[float] = set()
+    for screen_bundle in roi_per_screen:
+        for circuit in screen_bundle.get("circuits", {}).values():
+            if isinstance(circuit, dict):
+                if "score" in circuit:
+                    allowed_scores.add(round(float(circuit["score"]), 1))
+                if "peak" in circuit:
+                    allowed_scores.add(round(float(circuit["peak"]), 1))
+        for row in screen_bundle.get("regions", []):
+            if isinstance(row, dict):
+                if "score" in row:
+                    allowed_scores.add(round(float(row["score"]), 1))
+                if "peak" in row:
+                    allowed_scores.add(round(float(row["peak"]), 1))
+    return allowed_scores
 
 
 def _normalized_text(value: str | None) -> str | None:
@@ -286,6 +304,29 @@ def _normalize_evidence_regions(
         fallback_region = screen_regions[0] if screen_regions else (allowed_regions[0] if allowed_regions else None)
         if fallback_region is not None:
             rec.evidence.region = fallback_region
+
+
+def _normalize_evidence_score_ranks(recommendations: Recommendations) -> None:
+    for rec in recommendations.recommendations:
+        rec.evidence.score_rank = rank_score(rec.evidence.activation_score)
+
+
+def _validate_evidence_against_roi(
+    recommendations: Recommendations,
+    roi_per_screen: list[dict[str, Any]],
+) -> None:
+    allowed_scores = _allowed_roi_scores(roi_per_screen)
+
+    for rec in recommendations.recommendations:
+        cited_score = round(rec.evidence.activation_score, 1)
+        if cited_score not in allowed_scores:
+            raise ValueError(
+                f"Recommendation cites activation_score {cited_score} not present in ROI bundle"
+            )
+        if rec.evidence.score_rank != rank_score(rec.evidence.activation_score):
+            raise ValueError(
+                "Recommendation score_rank does not match activation_score"
+            )
 
 
 def _layout_flag_matches_simulation_event(rec: Any, sim_log: SimulationLog) -> bool:
@@ -464,6 +505,8 @@ async def generate_recommendations(
                 result if isinstance(result, Recommendations) else Recommendations.model_validate(result)
             )
             _normalize_evidence_regions(recommendations, _screen_roi_map(roi_per_screen))
+            _normalize_evidence_score_ranks(recommendations)
+            _validate_evidence_against_roi(recommendations, roi_per_screen)
             try:
                 validate_behavioral_coverage(
                     normalized_sim_log,
