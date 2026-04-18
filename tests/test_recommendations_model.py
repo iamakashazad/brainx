@@ -23,7 +23,7 @@ class TestRecommendationsPydantic:
     def test_rec_type_discriminator_values(self):
         from backend.models.recommendations import Recommendation
 
-        for rec_type in ("copy_rewrite", "layout_flag", "memorability", "emotional_dropoff"):
+        for rec_type in ("copy_rewrite", "memorability", "emotional_dropoff"):
             recommendation = Recommendation(
                 rec_type=rec_type,
                 screen_index=0,
@@ -31,6 +31,25 @@ class TestRecommendationsPydantic:
                 rationale="test rationale",
             )
             assert recommendation.rec_type == rec_type
+
+        layout_flag = Recommendation(
+            rec_type="layout_flag",
+            screen_index=0,
+            evidence={
+                "circuit": "Cognitive Load",
+                "region": "G_front_middle",
+                "activation_score": 84.0,
+                "score_rank": "Very High",
+            },
+            target_region={
+                "x_ratio": 0.15,
+                "y_ratio": 0.32,
+                "width_ratio": 0.55,
+                "height_ratio": 0.12,
+            },
+            rationale="test rationale",
+        )
+        assert layout_flag.rec_type == "layout_flag"
 
         with pytest.raises(ValidationError):
             Recommendation(
