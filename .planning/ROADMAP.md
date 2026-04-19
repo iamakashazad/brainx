@@ -74,7 +74,7 @@ Plans:
 
 Plans:
 - [ ] 03.2-01: Create `02-VERIFICATION.md` from shipped Phase 2 code, tests, and UAT evidence
-- [ ] 03.2-02: Refresh stale Phase 1 verification/UAT artifacts and reconcile `REQUIREMENTS.md` traceability
+- [ ] 03.2-02: Refresh stale Phase 1 verification artifact and reconcile `REQUIREMENTS.md` traceability
 - [ ] 03.2-03: Re-run milestone audit and confirm clean closure evidence
 
 ### Phase 4: Frontend — Upload, Persona, and Results
