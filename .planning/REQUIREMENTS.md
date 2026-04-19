@@ -24,22 +24,22 @@
 
 - [x] **SIM-01**: System generates a gaze narrative via DeepSeek (persona + content → structured text session log) as TRIBEv2 input
 - [x] **SIM-02**: System produces a scroll and hesitation map overlay derived from the simulation log
-- [ ] **SIM-03**: System supports a video slideshow fallback path — auto-activated if text pathway signal differentiation is below threshold
+- [x] **SIM-03**: System supports a video slideshow fallback path — auto-activated if text pathway signal differentiation is below threshold
 - [x] **SIM-04**: User can view the raw simulation log (full DeepSeek session output)
 
 ### Brain Analysis
 
-- [ ] **BRAIN-01**: System generates 5-circuit cortical activation maps: attention, cognitive load, emotional response, memory encoding, and reward-related cortex (OFC, insula, ACC, parahippocampal — cortical proxies only; no subcortical)
-- [ ] **BRAIN-02**: System generates a separate brain activation map for each screen in the uploaded flow
-- [ ] **BRAIN-03**: System shows flow-level continuity — how cognitive load and emotional engagement shift across screens over the session arc
-- [ ] **BRAIN-04**: System provides a named-region ROI score table with numeric activation values alongside the 3D visualization
+- [x] **BRAIN-01**: System generates 5-circuit cortical activation maps: attention, cognitive load, emotional response, memory encoding, and reward-related cortex (OFC, insula, ACC, parahippocampal — cortical proxies only; no subcortical)
+- [x] **BRAIN-02**: System generates a separate brain activation map for each screen in the uploaded flow
+- [x] **BRAIN-03**: System shows flow-level continuity — how cognitive load and emotional engagement shift across screens over the session arc
+- [x] **BRAIN-04**: System provides a named-region ROI score table with numeric activation values alongside the 3D visualization
 
 ### Recommendations Engine
 
-- [ ] **REC-01**: System generates specific copy rewrites (headlines, CTAs, microcopy) grounded in ROI activation data — each recommendation must cite the specific brain region and activation score driving it
-- [ ] **REC-02**: System flags layout elements triggering cognitive overload, being skipped by the persona, or failing to activate reward-related cortex
-- [ ] **REC-03**: System predicts which screens in the flow will be remembered vs. forgotten after the session
-- [ ] **REC-04**: System identifies emotional drop-off points in the flow with suggested structural and copy fixes
+- [x] **REC-01**: System generates specific copy rewrites (headlines, CTAs, microcopy) grounded in ROI activation data — each recommendation must cite the specific brain region and activation score driving it
+- [x] **REC-02**: System flags layout elements triggering cognitive overload, being skipped by the persona, or failing to activate reward-related cortex
+- [x] **REC-03**: System predicts which screens in the flow will be remembered vs. forgotten after the session
+- [x] **REC-04**: System identifies emotional drop-off points in the flow with suggested structural and copy fixes
 
 ### Frontend
 
@@ -50,9 +50,9 @@
 
 ### Infrastructure
 
-- [ ] **INFRA-01**: Python 3.11 + FastAPI backend with single asyncio.Queue GPU job queue (uvicorn --workers 1 mandatory)
-- [ ] **INFRA-02**: TRIBEv2 loaded once at server startup via FastAPI lifespan; three repo patches applied at clone time (numpy pin, TemporalSmoothing, and any open issues)
-- [ ] **INFRA-03**: Job status polling API so frontend can display queue position and progress without websockets
+- [x] **INFRA-01**: Python 3.11 + FastAPI backend with single asyncio.Queue GPU job queue (uvicorn --workers 1 mandatory)
+- [x] **INFRA-02**: TRIBEv2 loaded once at server startup via FastAPI lifespan; three repo patches applied at clone time (numpy pin, TemporalSmoothing, and any open issues)
+- [x] **INFRA-03**: Job status polling API so frontend can display queue position and progress without websockets
 
 ## v2 Requirements
 
@@ -91,28 +91,28 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| INFRA-01 | Phase 1 | Pending |
-| INFRA-02 | Phase 3.2 | Pending |
-| INFRA-03 | Phase 1 | Pending |
-| SIM-01 | Phase 3.2 | Complete |
-| SIM-03 | Phase 3.1 | Pending |
-| SIM-02 | Phase 3.2 | Complete |
-| SIM-04 | Phase 3.2 | Complete |
-| CONT-01 | Phase 3.2 | Complete |
-| CONT-02 | Phase 3.2 | Complete |
-| CONT-03 | Phase 3.2 | Complete |
-| BRAIN-01 | Phase 3 | Pending |
-| BRAIN-02 | Phase 3 | Pending |
-| BRAIN-03 | Phase 3 | Pending |
-| BRAIN-04 | Phase 3 | Pending |
-| REC-01 | Phase 3 | Pending |
-| REC-02 | Phase 3 | Pending |
-| REC-03 | Phase 3 | Pending |
-| REC-04 | Phase 3 | Pending |
-| PERS-01 | Phase 3.2 | Complete |
-| PERS-02 | Phase 3.2 | Complete |
-| PERS-03 | Phase 3.2 | Complete |
-| PERS-04 | Phase 3.2 | Complete |
+| INFRA-01 | Phase 1 | Satisfied |
+| INFRA-02 | Phase 1 | Satisfied |
+| INFRA-03 | Phase 1 | Satisfied |
+| SIM-01 | Phase 2 | Satisfied |
+| SIM-02 | Phase 2 | Satisfied |
+| SIM-03 | Phase 3.1 | Satisfied |
+| SIM-04 | Phase 2 | Satisfied |
+| CONT-01 | Phase 2 | Satisfied |
+| CONT-02 | Phase 2 | Satisfied |
+| CONT-03 | Phase 2 | Satisfied |
+| BRAIN-01 | Phase 3 | Satisfied |
+| BRAIN-02 | Phase 3 | Satisfied |
+| BRAIN-03 | Phase 3 | Satisfied |
+| BRAIN-04 | Phase 3 | Satisfied |
+| REC-01 | Phase 3 | Satisfied |
+| REC-02 | Phase 3 | Satisfied |
+| REC-03 | Phase 3 | Satisfied |
+| REC-04 | Phase 3 | Satisfied |
+| PERS-01 | Phase 2 | Satisfied |
+| PERS-02 | Phase 2 | Satisfied |
+| PERS-03 | Phase 2 | Satisfied |
+| PERS-04 | Phase 2 | Satisfied |
 | FE-01 | Phase 4 | Pending |
 | FE-02 | Phase 4 | Pending |
 | FE-03 | Phase 5 | Pending |
@@ -125,4 +125,4 @@
 
 ---
 *Requirements defined: 2026-04-06*
-*Last updated: 2026-04-19 after Phase 03.2-01 verification reconciliation*
+*Last updated: 2026-04-19 after Phase 03.2-02 traceability reconciliation*
