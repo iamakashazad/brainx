@@ -9,23 +9,23 @@
 
 ### Content Input
 
-- [ ] **CONT-01**: User can upload 1–5 UI screens as images to form an analysis flow
-- [ ] **CONT-02**: User can upload static content (ads, social media images) for standalone analysis
-- [ ] **CONT-03**: User can paste text directly as content for analysis without uploading an image
+- [x] **CONT-01**: User can upload 1–5 UI screens as images to form an analysis flow
+- [x] **CONT-02**: User can upload static content (ads, social media images) for standalone analysis
+- [x] **CONT-03**: User can paste text directly as content for analysis without uploading an image
 
 ### Persona Builder
 
-- [ ] **PERS-01**: User can define a persona with demographics (age, role, background) and psychographic profile (goals, values, motivations)
-- [ ] **PERS-02**: User can set cognitive state for the persona (attention span, stress level, tech literacy)
-- [ ] **PERS-03**: User can set usage environment (device type, location context, ambient conditions)
-- [ ] **PERS-04**: User can save a persona and reuse it across multiple analysis sessions
+- [x] **PERS-01**: User can define a persona with demographics (age, role, background) and psychographic profile (goals, values, motivations)
+- [x] **PERS-02**: User can set cognitive state for the persona (attention span, stress level, tech literacy)
+- [x] **PERS-03**: User can set usage environment (device type, location context, ambient conditions)
+- [x] **PERS-04**: User can save a persona and reuse it across multiple analysis sessions
 
 ### Simulation
 
-- [ ] **SIM-01**: System generates a gaze narrative via DeepSeek (persona + content → structured text session log) as TRIBEv2 input
-- [ ] **SIM-02**: System produces a scroll and hesitation map overlay derived from the simulation log
+- [x] **SIM-01**: System generates a gaze narrative via DeepSeek (persona + content → structured text session log) as TRIBEv2 input
+- [x] **SIM-02**: System produces a scroll and hesitation map overlay derived from the simulation log
 - [ ] **SIM-03**: System supports a video slideshow fallback path — auto-activated if text pathway signal differentiation is below threshold
-- [ ] **SIM-04**: User can view the raw simulation log (full DeepSeek session output)
+- [x] **SIM-04**: User can view the raw simulation log (full DeepSeek session output)
 
 ### Brain Analysis
 
@@ -94,13 +94,13 @@
 | INFRA-01 | Phase 1 | Pending |
 | INFRA-02 | Phase 3.2 | Pending |
 | INFRA-03 | Phase 1 | Pending |
-| SIM-01 | Phase 3.2 | Pending |
+| SIM-01 | Phase 3.2 | Complete |
 | SIM-03 | Phase 3.1 | Pending |
-| SIM-02 | Phase 3.2 | Pending |
-| SIM-04 | Phase 3.2 | Pending |
-| CONT-01 | Phase 3.2 | Pending |
-| CONT-02 | Phase 3.2 | Pending |
-| CONT-03 | Phase 3.2 | Pending |
+| SIM-02 | Phase 3.2 | Complete |
+| SIM-04 | Phase 3.2 | Complete |
+| CONT-01 | Phase 3.2 | Complete |
+| CONT-02 | Phase 3.2 | Complete |
+| CONT-03 | Phase 3.2 | Complete |
 | BRAIN-01 | Phase 3 | Pending |
 | BRAIN-02 | Phase 3 | Pending |
 | BRAIN-03 | Phase 3 | Pending |
@@ -109,10 +109,10 @@
 | REC-02 | Phase 3 | Pending |
 | REC-03 | Phase 3 | Pending |
 | REC-04 | Phase 3 | Pending |
-| PERS-01 | Phase 3.2 | Pending |
-| PERS-02 | Phase 3.2 | Pending |
-| PERS-03 | Phase 3.2 | Pending |
-| PERS-04 | Phase 3.2 | Pending |
+| PERS-01 | Phase 3.2 | Complete |
+| PERS-02 | Phase 3.2 | Complete |
+| PERS-03 | Phase 3.2 | Complete |
+| PERS-04 | Phase 3.2 | Complete |
 | FE-01 | Phase 4 | Pending |
 | FE-02 | Phase 4 | Pending |
 | FE-03 | Phase 5 | Pending |
@@ -125,4 +125,4 @@
 
 ---
 *Requirements defined: 2026-04-06*
-*Last updated: 2026-04-18 after gap-closure phase creation*
+*Last updated: 2026-04-19 after Phase 03.2-01 verification reconciliation*

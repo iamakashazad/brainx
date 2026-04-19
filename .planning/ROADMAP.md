@@ -73,7 +73,7 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 03.2-01: Create `02-VERIFICATION.md` from shipped Phase 2 code, tests, and UAT evidence
+- [x] 03.2-01: Create `02-VERIFICATION.md` from shipped Phase 2 code, tests, and UAT evidence
 - [ ] 03.2-02: Refresh stale Phase 1 verification artifact and reconcile `REQUIREMENTS.md` traceability
 - [ ] 03.2-03: Re-run milestone audit and confirm clean closure evidence
 
@@ -107,6 +107,6 @@ Plans:
 | 2. Simulation Pipeline and Content Input | 5/5 | Complete | 2026-04-16 |
 | 3. Full Pipeline Integration and Recommendations | 5/5 | Complete | 2026-04-18 |
 | 3.1. Runtime Fallback Wiring and Pathway Closure | 2/2 | Complete    | 2026-04-18 |
-| 3.2. Verification and Traceability Reconciliation | 0/3 | Not started | - |
+| 3.2. Verification and Traceability Reconciliation | 1/3 | In Progress | - |
 | 4. Frontend — Upload, Persona, and Results | 0/3 | Not started | - |
 | 5. Session Persistence, Demo, and Polish | 0/3 | Not started | - |
