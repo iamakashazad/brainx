@@ -58,7 +58,7 @@ result: pass
 verified_by: tests/test_content_processing.py::test_pillow_pipeline, test_mime_spoof_raises, test_oversize_raises, test_empty_raises; tests/test_content_api.py::test_mime_spoofing_rejected, test_oversize_rejected
 
 ### 10. /analyze End-to-End Job
-expected: POST /analyze with valid persona_id + content_id returns 202 with a job_id. Polling GET /jobs/{id} shows stage progressing through queued → simulating → grounding → inferring → processing → complete, and final result_json contains simulation, overlays, and activation keys.
+expected: POST /analyze with valid persona_id + content_id returns 201 with a job_id. Polling GET /jobs/{id} shows the queued job progressing through simulation, grounding, inference, processing, and completion, and final result_json contains simulation, overlays, and activation keys.
 result: pass
 verified_by: tests/test_analyze.py::test_happy_path, test_stage_transitions, test_bad_persona, test_bad_content; tests/test_queue_transitions.py::test_transition_writes; tests/test_simulation_pipeline.py::test_text_sim_happy, test_log_viewable
 
