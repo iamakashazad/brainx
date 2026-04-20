@@ -3,34 +3,34 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 03.2-03-PLAN.md
-last_updated: "2026-04-19T18:25:33.249Z"
+stopped_at: Completed 03.2-05-PLAN.md
+last_updated: "2026-04-20T00:00:00.000Z"
 progress:
   total_phases: 7
   completed_phases: 5
-  total_plans: 25
-  completed_plans: 19
-  percent: 76
+  total_plans: 27
+  completed_plans: 21
+  percent: 78
 ---
 
 # Project State — BrainX
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-19)
+See: .planning/PROJECT.md (updated 2026-04-20)
 
 **Core value:** The only tool that simulates real-world usage context before measuring brain response — not a heatmap, not contrast checking.
-**Current focus:** Phase 04 — frontend-upload-persona-and-results
+**Current focus:** Phase 03.2 — verification-and-traceability-reconciliation
 
 ## Current Position
 
-Phase: 04 (frontend-upload-persona-and-results) — NEXT
-Plan: 1 of 3
-Status: Ready to execute
+Phase: 03.2 (verification-and-traceability-reconciliation) — EXECUTING
+Plan: 1 of 5
+Status: Executing Phase 03.2
 
 ## Progress
 
-Progress: ████████░░ 76% of roadmap plans complete (19/25)
+Progress: ████████░░ 78% of roadmap plans complete (21/27)
 
 Initialization checklist:
 
@@ -45,24 +45,24 @@ Initialization checklist:
 
 ## Recent Decisions
 
-- Used `backend/routers/analyze.py` and `tests/test_analyze.py::test_happy_path` as the source of truth for the Phase 2 `/analyze` response code.
+- Used `backend/routers/analyze.py` and `tests/test_analyze.py::test_analyze_keeps_text_path_for_text_content_when_video_is_default` as the source of truth for the Phase 2 `/analyze` response code (original `test_happy_path` reference deleted with the test; replacement tests are green per 03.2-04).
 - Kept `02-VERIFICATION.md` bounded to the ten Phase 2 requirements so later-phase behaviors were not overclaimed.
-- Logged the unrelated `test_log_viewable` runtime failure to `.planning/phases/03.2-verification-and-traceability-reconciliation/deferred-items.md` instead of widening this docs-only plan into backend remediation.
 - Rebuilt `01-VERIFICATION.md` from current CPU-first runtime evidence and the later `01-04` and `03.1` closure artifacts instead of preserving the superseded blocker verdict.
 - Updated `REQUIREMENTS.md` to map backend requirements to their owning verified phases with `Satisfied` status.
 - Re-ran the milestone audit against `01-VERIFICATION.md`, `02-VERIFICATION.md`, `03-VERIFICATION.md`, and `03.1-VERIFICATION.md`, producing a passed backend-milestone closure artifact.
+- Repaired the `test_log_viewable` regression in 03.2-04 by patching fsaverage5-compatible inference shape and synthetic atlas in the test harness; no backend code change required.
 - YOLO mode (auto-approve)
 - Parallel plan execution
 - The backend milestone is closed; the next major workstream is the Phase 4 frontend built on the now-stable backend contract.
 
 ## Blockers / Concerns
 
-- No active backend blocker remains for the analyze-to-results pipeline
+- No active backend blocker remains for the analyze-to-results pipeline (SIM-04 test-harness regression repaired in 03.2-04; shipped backend was never broken)
 - Phase 4 frontend execution is the next planned workstream
 - Phase 5 persistence/demo work remains open after the frontend
 
 ## Session Continuity
 
-Last session: 2026-04-19T18:25:33.246Z
-Stopped at: Completed 03.2-03-PLAN.md
+Last session: 2026-04-20T00:00:00.000Z
+Stopped at: Completed 03.2-05-PLAN.md
 Resume file: None
