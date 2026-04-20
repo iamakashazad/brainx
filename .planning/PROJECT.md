@@ -55,7 +55,7 @@ The only tool that simulates real-world usage context before measuring brain res
 - TRIBEv2 is Meta's open-source brain prediction model (https://github.com/facebookresearch/tribev2). It is non-commercial licensed. The strategy is: use it for research preview and audience building now, then swap the brain model engine for a commercial-friendly alternative when ready to monetize.
 - DeepSeek powers the simulation and recommendation stack: DeepSeek-V3 for text-first reasoning and DeepSeek-VL2-class vision support for image-grounded analysis.
 - TRIBEv2 runs locally in the backend runtime. The current shipped default is CPU-first for reliability, with no cloud inference dependency in v1.
-- Current backend state: Phases 1 through 3.1 are verified, and Phase 3.2 is reconciling the project artifacts so the shared `/analyze` worker, fallback path, and requirement traceability all describe the same shipped system.
+- Current backend state: Phases 1 through 3.2 are verified. Phase 3.2 is complete: the shared `/analyze` worker, fallback path, and requirement traceability now all describe the same shipped system, and the Phase 2 executable evidence chain is green after the 03.2-04 regression repair.
 - The "interpretation layer" (recommendations engine) sits on top of TRIBEv2 output and translates activation maps into actionable design and copy changes. This layer is the defensible IP — it is model-agnostic and will survive a model swap.
 - Content scope for MVP: UI screens (design flows) + static content (ads, social images, text). Video is deferred to v2.
 - Primary audience: designers, marketers, content creators. Research preview builds credibility before commercial product launch.
@@ -95,4 +95,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-19 after Phase 03.2-02 reconciliation*
+*Last updated: 2026-04-20 after Phase 03.2-04/05 gap closure*
