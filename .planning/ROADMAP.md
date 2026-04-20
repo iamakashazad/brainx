@@ -10,7 +10,7 @@ BrainX is built in strict pipeline order: the backend foundation and TRIBEv2 int
 - [x] **Phase 2: Simulation Pipeline and Content Input** - DeepSeek simulation service, all content input types, persona builder, and simulation output validation
 - [x] **Phase 3: Full Pipeline Integration and Recommendations** - End-to-end pipeline from content + persona to brain maps and grounded copy recommendations
 - [x] **Phase 3.1: Runtime Fallback Wiring and Pathway Closure** - Wire the slideshow/video fallback into the shared analyze flow and prove SIM-03 in the shipped runtime path (completed 2026-04-18)
-- [x] **Phase 3.2: Verification and Traceability Reconciliation** - Create the missing Phase 2 verification, refresh stale audit artifacts, and reconcile requirement traceability before re-audit (completed 2026-04-19)
+- [x] **Phase 3.2: Verification and Traceability Reconciliation** - Create the missing Phase 2 verification, refresh stale audit artifacts, and reconcile requirement traceability before re-audit (completed 2026-04-19; gap closure 03.2-04/05 added 2026-04-20)
 - [ ] **Phase 4: Frontend — Upload, Persona, and Results** - Complete React frontend with 3D brain visualization, persona form, upload flow, and results view
 - [ ] **Phase 5: Session Persistence, Demo, and Polish** - Session history, re-loadable results, pre-built demo case study, and production hardening
 
@@ -70,12 +70,14 @@ Plans:
 **Depends on**: Phase 3.1
 **Requirements**: INFRA-02, SIM-01, SIM-02, SIM-04, CONT-01, CONT-02, CONT-03, PERS-01, PERS-02, PERS-03, PERS-04
 **Gap Closure**: Closes the v1.0 milestone audit requirement-orphan and documentation-drift gaps
-**Plans**: 3 plans
+**Plans**: 5 plans
 
 Plans:
 - [x] 03.2-01: Create `02-VERIFICATION.md` from shipped Phase 2 code, tests, and UAT evidence
 - [x] 03.2-02: Refresh stale Phase 1 verification artifact and reconcile `REQUIREMENTS.md` traceability
 - [x] 03.2-03: Re-run milestone audit and confirm clean closure evidence
+- [x] 03.2-04: Repair the `test_log_viewable` test-harness regression and remove stale `test_happy_path` references from Phase 2 verification/UAT/validation
+- [x] 03.2-05: Reconcile `PROJECT.md`/`STATE.md` narrative and re-audit the milestone against the post-03.2-04 Phase 2 evidence chain
 
 ### Phase 4: Frontend — Upload, Persona, and Results
 **Goal**: Users can submit an analysis through a complete React UI and view brain activation maps alongside grounded recommendations in a single results panel
@@ -107,6 +109,6 @@ Plans:
 | 2. Simulation Pipeline and Content Input | 5/5 | Complete | 2026-04-16 |
 | 3. Full Pipeline Integration and Recommendations | 5/5 | Complete | 2026-04-18 |
 | 3.1. Runtime Fallback Wiring and Pathway Closure | 2/2 | Complete    | 2026-04-18 |
-| 3.2. Verification and Traceability Reconciliation | 3/3 | Complete | 2026-04-19 |
+| 3.2. Verification and Traceability Reconciliation | 5/5 | Complete | 2026-04-20 |
 | 4. Frontend — Upload, Persona, and Results | 0/3 | Not started | - |
 | 5. Session Persistence, Demo, and Polish | 0/3 | Not started | - |
