@@ -60,7 +60,7 @@ verified_by: tests/test_content_processing.py::test_pillow_pipeline, test_mime_s
 ### 10. /analyze End-to-End Job
 expected: POST /analyze with valid persona_id + content_id returns 201 with a job_id. Polling GET /jobs/{id} shows the queued job progressing through simulation, grounding, inference, processing, and completion, and final result_json contains simulation, overlays, and activation keys.
 result: pass
-verified_by: tests/test_analyze.py::test_happy_path, test_stage_transitions, test_bad_persona, test_bad_content; tests/test_queue_transitions.py::test_transition_writes; tests/test_simulation_pipeline.py::test_text_sim_happy, test_log_viewable
+verified_by: tests/test_analyze.py::test_analyze_keeps_text_path_for_text_content_when_video_is_default, test_stage_transitions, test_bad_persona, test_bad_content; tests/test_queue_transitions.py::test_transition_writes; tests/test_simulation_pipeline.py::test_text_sim_happy, test_log_viewable
 
 ### 11. Deterministic Overlays from Simulation
 expected: For a completed /analyze job with image content, result_json.overlays contains hesitation/scroll overlays derived from simulation events, sorted deterministically (same job re-run produces identical overlay order).

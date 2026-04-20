@@ -79,7 +79,7 @@ updated: 2026-04-16
 | 02-04-01 | 02-04 | 4 | SIM-02 | — | scroll_path timestamp-ordered | unit | `pytest tests/test_overlay.py::test_scroll_path_order -x` | ✅ existing | ✅ green |
 | 02-04-01 | 02-04 | 4 | SIM-02 | — | text content → scroll_path absent | unit | `pytest tests/test_overlay.py::test_text_no_scroll -x` | ✅ existing | ✅ green |
 | 02-04-01 | 02-04 | 4 | SIM-02 | — | deterministic ordering | unit | `pytest tests/test_overlay.py::test_deterministic -x` | ✅ existing | ✅ green |
-| 02-04-02 | 02-04 | 4 | D-11 | — | /analyze happy → job PENDING + FKs set | integration | `pytest tests/test_analyze.py::test_happy_path -x` | ✅ existing | ✅ green |
+| 02-04-02 | 02-04 | 4 | D-11 | — | /analyze happy → job PENDING + FKs set | integration | `pytest tests/test_analyze.py::test_analyze_keeps_text_path_for_text_content_when_video_is_default -x` | ✅ existing | ✅ green |
 | 02-04-02 | 02-04 | 4 | D-11 | — | /analyze bad persona → 404 | integration | `pytest tests/test_analyze.py::test_bad_persona -x` | ✅ existing | ✅ green |
 | 02-04-02 | 02-04 | 4 | D-11 | — | /analyze bad content → 404 | integration | `pytest tests/test_analyze.py::test_bad_content -x` | ✅ existing | ✅ green |
 | 02-04-03 | 02-04 | 4 | D-12 | — | Phase 1 /test-inference still green | integration | `pytest tests/test_api.py::test_submit_and_poll_job -x` | ✅ existing | ✅ green |
