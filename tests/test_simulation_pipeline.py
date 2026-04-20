@@ -171,7 +171,10 @@ async def test_log_viewable(
         "labels": _labels,
     }
     monkeypatch.setattr("backend.core.queue.get_surf_atlas", lambda: _atlas)
-    stub_queue_recommendations(mixed_recommendations_payload)
+    single_screen_recommendations = {
+        "recommendations": [{**mixed_recommendations_payload["recommendations"][0]}]
+    }
+    stub_queue_recommendations(single_screen_recommendations)
 
     valid = json.dumps(
         {
