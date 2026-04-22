@@ -55,18 +55,21 @@ Exceptions:
 
 ## Typography
 
-| Role | Font | Size | Weight | Line Height | Usage |
+Two weights only: 400 (regular) and 600 (semibold).
+
+| Role | Font | Size | Weight | Line-height | Usage |
 |------|------|------|--------|-------------|-------|
 | Body | Inter (sans) | 16px | 400 | 1.5 | Paragraph copy, form labels, recommendation text |
-| Label / Caption | Inter (sans) | 14px | 500 | 1.4 | Field labels, nav step labels, badge text, tab labels |
-| Heading | Inter (sans) | 20px | 600 | 1.25 | Card headings, section titles, panel headings |
-| Display | Inter (sans) | 28px | 700 | 1.2 | Page-level headers (e.g., "Results"), wizard step title |
-| Numeric readout | Roboto Mono (mono) | 14px | 500 | 1.0 | ROI scores, circuit activation values, queue position |
-| Numeric large | Roboto Mono (mono) | 20px | 600 | 1.0 | Primary score readout, top-level activation percentage |
+| Label / Caption | Inter (sans) | 14px | 600 | 1.4 | Field labels, nav step labels, badge text, tab labels |
+| Heading | Inter (sans) | 20px | 600 | 1.3 | Card headings, section titles, panel headings |
+| Display | Inter (sans) | 28px | 600 | 1.2 | Page-level headers (e.g., "Results"), wizard step title |
+| Numeric readout | Roboto Mono (mono) | 14px | 400 | 1.4 | ROI scores, circuit activation values, queue position |
+| Numeric large | Roboto Mono (mono) | 20px | 600 | 1.3 | Primary score readout, top-level activation percentage |
 
 Notes:
 - Lora (serif) is declared in the token file but reserved for future display use; do not use in Phase 4 components.
 - All font sizes are in `px` in this contract; use `rem` equivalents in code (`16px = 1rem`, `14px = 0.875rem`, etc.).
+- `04-DESIGN-TOKENS.css` defines font-family tokens only; no weight variables are set in the token file, so no CSS changes are required there.
 
 ---
 
@@ -121,7 +124,7 @@ Chart bars use a left-to-right gradient from `--chart-N` at 100% opacity to 40% 
 The following components must be authored for this phase. All consume tokens; no color literals.
 
 ### Wizard Shell
-- `WizardStepper` — 4 steps (Persona / Content / Run / Results); free navigation between completed steps; state indicator per step (inactive / active / complete); horizontal or vertical layout at implementor discretion; step labels in Label style (14px/500).
+- `WizardStepper` — 4 steps (Persona / Content / Run / Results); free navigation between completed steps; state indicator per step (inactive / active / complete); horizontal or vertical layout at implementor discretion; step labels in Label style (14px/600).
 - `WizardStep` — container component that wraps each step's content area with `--card` background, `--shadow-lg`, and standard `lg` (24px) padding.
 
 ### Persona Step (Step 1)
@@ -140,7 +143,7 @@ The following components must be authored for this phase. All consume tokens; no
 ### Progress View (Step 3 / Run)
 - `ProgressView` — full-screen, non-dismissable; `--background` fill; centered layout.
 - `StageIndicator` — 5-stage vertical or horizontal stepper: PENDING → SIMULATING → INFERRING → AGGREGATING → COMPLETE; active stage highlighted with `--primary`; completed stages with checkmark.
-- `QueueBadge` — "Position N in queue" displayed in Roboto Mono 14px/500 using `--muted-foreground`; hidden when queue_position is 0 or null.
+- `QueueBadge` — "Position N in queue" displayed in Roboto Mono 14px/400 using `--muted-foreground`; hidden when queue_position is 0 or null.
 - `ProgressSummary` — optional side panel (Claude's discretion) showing persona name + content thumbnail while job runs; uses `--card` surface.
 
 ### Results View (Step 4)
@@ -150,7 +153,7 @@ The following components must be authored for this phase. All consume tokens; no
 - `CircuitSelector` — toggle/button group for 5 circuits; active circuit highlighted with `--primary`; circuit names from backend `ScreenROI.circuits`; default = highest-scoring circuit for this job; Roboto Mono 14px labels.
 - `TimelineScrubber` — horizontal scrubber with one tick per uploaded screen; auto-plays once through all screens on results load (settles on final screen); scrubbable after; `--primary` thumb and filled track; 44px touch target height.
 - `ROIScoreTable` — named-region score table; Roboto Mono 14px for score values; `--card` background; alternating `--muted` row tint.
-- `CircuitScoreBar` — animated gradient bar (chart tokens); height 20px; label 14px/500 Inter; value Roboto Mono 14px/500; grows from 0 to score value on mount (400ms ease-out).
+- `CircuitScoreBar` — animated gradient bar (chart tokens); height 20px; label 14px/600 Inter; value Roboto Mono 14px/400; grows from 0 to score value on mount (400ms ease-out).
 - `RecommendationsPanel` — scrollable list of recommendations; each item is a `RecommendationCard`.
 - `RecommendationCard` — `--card` background; tilt/lift hover; clickable — on click highlights referenced region on BrainCanvas and scrubs to referenced screen; primary evidence location jumped to; secondary locations marked as small dots on timeline; clicking same card again cycles through all referenced locations.
 - `FlowContinuityChart` — line/area chart showing cognitive load and emotional engagement across screens; chart tokens for fill; mounted with draw-on animation (left to right, 600ms).
@@ -226,36 +229,41 @@ Reduced motion: all durations collapse to 0ms when `prefers-reduced-motion: redu
 
 ## Copywriting Contract
 
-| Element | Copy |
-|---------|------|
-| Primary wizard CTA (step 1→2) | "Next: Add Content" |
-| Primary wizard CTA (step 2→run) | "Analyze Content" |
-| Persona library empty state heading | "No personas yet" |
-| Persona library empty state body | "Create your first persona to define who will experience your content." |
-| Persona library empty state action | "Create Persona" |
-| Content upload empty state (Text tab) | Placeholder: "Describe or paste the content your persona will experience…" |
-| Content upload empty state (Screens tab) | Drop zone label: "Drop 1–5 UI screens here, or click to browse" |
-| Content upload empty state (Static tab) | Drop zone label: "Drop a single image here, or click to browse" |
-| Progress view heading (PENDING) | "Queued" |
-| Progress view heading (SIMULATING) | "Simulating how your persona experiences this content…" |
-| Progress view heading (INFERRING) | "Running brain inference…" |
-| Progress view heading (AGGREGATING) | "Aggregating results…" |
-| Progress view heading (COMPLETE) | "Analysis complete" (briefly shown before auto-transition) |
-| Progress view queue badge | "Position {N} in queue" |
-| Results page heading | "Brain Analysis Results" |
-| Circuit selector label | "{circuit_name}" (exact name from backend `ScreenROI.circuits`) |
-| ROI score table heading | "Region Activation Scores" |
-| Recommendations panel heading | "Recommendations" |
-| Flow continuity chart heading | "Cognitive Arc" |
-| Error state — job FAILED heading | "Analysis failed" |
-| Error state — job FAILED body | "Something went wrong during brain inference. Check that your content uploaded correctly, then try again." |
-| Error state — job FAILED actions | "Try Again" (primary) / "Go Back" (secondary) |
-| Error state — network/poll failure | "Lost connection to the server. Retrying…" (inline banner; auto-retry every 5s) |
-| Destructive — delete persona | "Delete "{name}"?" → "This cannot be undone." → "Delete" (`--destructive`) / "Cancel" |
-| Save persona CTA | "Save Persona" |
-| Create persona CTA (in library) | "Create Persona" |
-| Back button (all wizard steps) | "Back" |
-| Screen upload count | "{N}/5 screens added" |
+| Element | Copy | Notes |
+|---------|------|-------|
+| Primary wizard CTA (step 1→2) | "Next: Add Content" | |
+| Primary wizard CTA (step 2→run) | "Analyze Content" | |
+| Back button (step 2, returning to Persona) | "Back to Persona" | Contextual label naming the destination step |
+| Back button (step 3, returning to Content) | "Back to Content" | Contextual label naming the destination step |
+| Back button (step 4, returning to Content) | "Back to Content" | Results → Content if user navigates back |
+| Persona library empty state heading | "No personas yet" | |
+| Persona library empty state body | "Create your first persona to define who will experience your content." | |
+| Persona library empty state action | "Create Persona" | |
+| Content upload empty state (Text tab) | Placeholder: "Describe or paste the content your persona will experience…" | |
+| Content upload empty state (Screens tab) | Drop zone label: "Drop 1–5 UI screens here, or click to browse" | |
+| Content upload empty state (Static tab) | Drop zone label: "Drop a single image here, or click to browse" | |
+| Progress view heading (PENDING) | "Queued" | |
+| Progress view heading (SIMULATING) | "Simulating how your persona experiences this content…" | |
+| Progress view heading (INFERRING) | "Running brain inference…" | |
+| Progress view heading (AGGREGATING) | "Aggregating results…" | |
+| Progress view heading (COMPLETE) | "Analysis complete" (briefly shown before auto-transition) | |
+| Progress view queue badge | "Position {N} in queue" | |
+| Results page heading | "Brain Analysis Results" | |
+| Circuit selector label | "{circuit_name}" (exact name from backend `ScreenROI.circuits`) | |
+| ROI score table heading | "Region Activation Scores" | |
+| Recommendations panel heading | "Recommendations" | |
+| Flow continuity chart heading | "Cognitive Arc" | |
+| Error state — job FAILED heading | "Analysis failed" | |
+| Error state — job FAILED body | "Something went wrong during brain inference. Check that your content uploaded correctly, then try again." | |
+| Error state — job FAILED actions | "Try Again" (primary) / "Go Back" (secondary) | |
+| Error state — network/poll failure | "Lost connection to the server. Retrying…" (inline banner; auto-retry every 5s) | |
+| Destructive — delete persona heading | "Delete "{name}"?" | Variable interpolation with persona name |
+| Destructive — delete persona body | "This cannot be undone." | |
+| Destructive — delete persona primary action | "Delete" using `--destructive` | |
+| Destructive — delete persona secondary action | "Keep Persona" | Safe-action label names the preserved entity; NOT "Cancel" |
+| Save persona CTA | "Save Persona" | |
+| Create persona CTA (in library) | "Create Persona" | |
+| Screen upload count | "{N}/5 screens added" | |
 
 ---
 
@@ -269,6 +277,7 @@ Reduced motion: all durations collapse to 0ms when `prefers-reduced-motion: redu
 - All form fields have explicit `<label>` associations (not just placeholder text).
 - `ProgressView` traps focus while non-dismissable (ARIA live region announces stage changes).
 - Reduced motion: `prefers-reduced-motion: reduce` collapses all durations as specified in Motion Contract.
+- All icon-only buttons (BrainPresetButtons, persona-card trash) MUST carry an explicit `aria-label` describing the action (e.g., `aria-label="View: Lateral Left"`, `aria-label="Delete persona: {name}"`).
 
 ---
 
