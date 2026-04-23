@@ -15,7 +15,7 @@ Deliver the complete React frontend for BrainX: a step wizard that lets users pi
 
 ### Project Shape & Stack
 - **D-01:** React app lives at `frontend/` as a sibling to `backend/`.
-- **D-02:** Vite + React 18 + TypeScript. No Next.js; no CSR-only JS.
+- **D-02:** Vite + React 18 or 19 + TypeScript. No Next.js; no CSR-only JS. _(Updated 2026-04-24: widened from "React 18" to "18 or 19" to accommodate `@react-three/fiber@9` peer dep; planner pins React 19 with user approval per /gsd-plan-phase verification loop.)_
 - **D-03:** Tailwind CSS + Radix UI primitives for unstyled a11y components. No shadcn/ui install — components authored against Radix + Tailwind directly, consuming the token layer in `04-DESIGN-TOKENS.css`.
 
 ### Vertex & Atlas Delivery

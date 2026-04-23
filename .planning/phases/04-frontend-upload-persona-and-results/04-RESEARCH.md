@@ -847,22 +847,24 @@ Wave 0 of plan 04-01 must create:
 
 ---
 
-## Open Questions / Blockers
+## Open Questions (RESOLVED)
 
 > **None of these are RESEARCH BLOCKED-level.** They are reconcilable during planning. But all four deserve explicit resolution before plan 04-02 starts.
+>
+> **Resolution status (2026-04-24):** All four resolved during `/gsd-plan-phase` orchestration. Per-question resolution notes inlined below.
 
-1. **Stage / status enum drift between CONTEXT.md, UI-SPEC.md, and the shipping backend.**
+1. **Stage / status enum drift between CONTEXT.md, UI-SPEC.md, and the shipping backend.** _(RESOLVED — Plan 04-02 Task 1 ships `frontend/src/lib/stageLabels.ts` with the 6→4 mapping below baked in; status terminal values `DONE`/`ERROR` map to display labels `COMPLETE`/`FAILED` only at the UI boundary, in-code types follow backend.)_
    - CONTEXT.md D-16 and UI-SPEC §Progress View list stages as "PENDING / SIMULATING / INFERRING / AGGREGATING / COMPLETE" and use "FAILED" for errors.
    - The shipping backend uses `status: PENDING | RUNNING | DONE | ERROR` plus `stage: simulation | grounding_check | inference | roi_aggregation | processing | recommendations` (lowercase, 6 stages).
    - **Recommended resolution:** keep the UI *copy* exactly as UI-SPEC specifies (that's user-facing language, not a contract), but map backend values to display labels in a single `frontend/src/lib/stageLabels.ts` helper. E.g. `stage: "simulation" → "Simulating how your persona experiences this content…"`. Two backend stages (`grounding_check`, `processing`) need display copy — reasonable defaults: "Verifying simulation quality…" and "Aggregating results…" respectively. UI-SPEC lines 247–250 already cover most of these; the missing two ("grounding_check" and "recommendations") need copy decisions. Planner's call, or a quick user confirmation.
 
-2. **`localStorage` rehydration of in-flight jobs.**
+2. **`localStorage` rehydration of in-flight jobs.** _(RESOLVED — Plan 04-02 ships `useJobRehydrate.ts` that reads `jobId` from the persisted wizard store on mount and resumes `useJobStatus` polling if status is `PENDING`/`RUNNING`.)_
    - D-18 says state persists across refresh. What happens if the user refreshes mid-RUNNING? Backend has the job; frontend should resume polling. No decision blocker — just a case to implement — but the planner should explicitly scope it in 04-02.
 
-3. **UI-SPEC D-10 cycling through secondary locations.**
+3. **UI-SPEC D-10 cycling through secondary locations.** _(RESOLVED — interpretation (a) adopted: group recommendations by `screen_index`. Plan 04-03 ships `recommendationsByScreen.ts` derived selector and treats each rec as a single primary location; "secondary" pointers are the other recs in the same screen group.)_
    - Each `Recommendation` carries exactly one `evidence.region`. The "cycle through multiple secondary locations" behavior needs a UX interpretation: either (a) it applies when multiple recommendations share the same `screen_index`, or (b) it is a property of `layout_flag` recs with both `target_region` and `evidence.region` (one is UI coordinates, the other is brain anatomy). Recommend **(a)**: group recommendations by `screen_index`, and clicking one rec highlights it while the rest of the group become "secondary" pointers on the scrubber/brain.
 
-4. **Copywriting gap: "grounding_check" and "recommendations" stage labels.**
+4. **Copywriting gap: "grounding_check" and "recommendations" stage labels.** _(RESOLVED — folded into Plan 04-02's `stageLabels.ts` mapping below. No new UI copy needed; UI-SPEC stays verbatim.)_
    - UI-SPEC Copywriting Contract covers `PENDING, SIMULATING, INFERRING, AGGREGATING, COMPLETE`. It does NOT cover the actual backend stages `grounding_check`, `processing`, `recommendations`. Minimal addition — recommend: "Validating simulation grounding…", "Finalizing results…", "Generating recommendations…". Planner may elect to fold these into the existing four display stages by mapping the 6 backend stages onto the 4 spec'd display stages for the UI:
      ```
      backend.stage → display.stage
