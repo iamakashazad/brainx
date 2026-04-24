@@ -8,12 +8,21 @@ import "./styles/index.css";
 
 document.documentElement.classList.add("dark");
 
-ReactDOM.createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <App />
-      </BrowserRouter>
-    </QueryClientProvider>
-  </React.StrictMode>,
-);
+async function prepareApp() {
+  if (import.meta.env.DEV && import.meta.env.VITE_USE_MSW === "1") {
+    const { worker } = await import("../tests/msw/browser");
+    await worker.start({ onUnhandledRequest: "bypass" });
+  }
+
+  ReactDOM.createRoot(document.getElementById("root")!).render(
+    <React.StrictMode>
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <App />
+        </BrowserRouter>
+      </QueryClientProvider>
+    </React.StrictMode>,
+  );
+}
+
+void prepareApp();

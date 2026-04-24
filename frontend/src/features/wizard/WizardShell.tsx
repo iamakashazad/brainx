@@ -1,3 +1,4 @@
+import { ResultsLayout } from "@/features/results/ResultsLayout";
 import { ContentTypeTabs } from "@/features/content/ContentTypeTabs";
 import { PersonaLibrary } from "@/features/persona/PersonaLibrary";
 import { ProgressView } from "@/features/run/ProgressView";
@@ -15,7 +16,7 @@ function getStepContent(step: 1 | 2 | 3 | 4) {
     case 3:
       return <ProgressView />;
     case 4:
-      return <div className="text-sm text-muted-foreground">Results - delivered by plan 04-03</div>;
+      return <ResultsLayout />;
     default:
       return null;
   }
@@ -86,6 +87,17 @@ export function WizardShell() {
               className="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground shadow-md transition hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
             >
               Analyze Content
+            </button>
+          </div>
+        ) : null}
+        {currentStep === 4 ? (
+          <div className="flex justify-start">
+            <button
+              type="button"
+              onClick={() => setStep(2)}
+              className="inline-flex items-center justify-center rounded-lg border border-border bg-card px-5 py-3 text-sm font-semibold text-card-foreground shadow-md transition hover:bg-accent"
+            >
+              Back to Content
             </button>
           </div>
         ) : null}

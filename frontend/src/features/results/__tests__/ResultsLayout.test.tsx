@@ -20,7 +20,12 @@ vi.mock("../CircuitScoreBar", () => ({
 }));
 
 vi.mock("../RecommendationsPanel", () => ({
-  RecommendationsPanel: () => <div>RecommendationsPanel</div>,
+  RecommendationsPanel: () => (
+    <section>
+      <h2>Recommendations</h2>
+      <div>RecommendationsPanel</div>
+    </section>
+  ),
 }));
 
 vi.mock("../ROIScoreTable", () => ({

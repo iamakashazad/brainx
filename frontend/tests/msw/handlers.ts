@@ -1,4 +1,5 @@
 import { http, HttpResponse } from "msw";
+import type { AnalysisResult, JobStatusResponse } from "@/lib/api-types";
 
 const now = "2026-04-24T12:00:00.000Z";
 
@@ -31,6 +32,100 @@ function createDefaultJobResponse(jobId: string): MockJobResponse {
   };
 }
 
+function buildFixtureResult(): AnalysisResult {
+  return {
+    schema_version: 1,
+    simulation: {},
+    overlays: [],
+    activations: [
+      {
+        screen_index: 0,
+        path: "activations/job-1/screen_1.npy",
+        shape: [4, 20484],
+        timesteps: 4,
+      },
+    ],
+    roi: [
+      {
+        screen_index: 0,
+        circuits: {
+          Attention: { score: 82.4, peak: 90.1 },
+          "Cognitive Load": { score: 41.2, peak: 55.4 },
+          "Emotional Response": { score: 33.6, peak: 45.7 },
+          "Memory Encoding": { score: 58.3, peak: 65.2 },
+          Reward: { score: 47.9, peak: 60.3 },
+        },
+        regions: [
+          { atlas_label: "S_front_inf", circuit: "Attention", score: 82.4, peak: 90.1 },
+          { atlas_label: "G_rectus", circuit: "Reward", score: 47.9, peak: 60.3 },
+          {
+            atlas_label: "G_oc-temp_med-Parahip",
+            circuit: "Memory Encoding",
+            score: 58.3,
+            peak: 65.2,
+          },
+        ],
+      },
+    ],
+    flow_continuity: {
+      circuits: {
+        Attention: {
+          per_screen: [{ screen_index: 0, score_0_100: 82.4, delta_from_prev: 0 }],
+          trend: "flat",
+        },
+        "Cognitive Load": {
+          per_screen: [{ screen_index: 0, score_0_100: 41.2, delta_from_prev: 0 }],
+          trend: "flat",
+        },
+        "Emotional Response": {
+          per_screen: [{ screen_index: 0, score_0_100: 33.6, delta_from_prev: 0 }],
+          trend: "flat",
+        },
+        "Memory Encoding": {
+          per_screen: [{ screen_index: 0, score_0_100: 58.3, delta_from_prev: 0 }],
+          trend: "flat",
+        },
+        Reward: {
+          per_screen: [{ screen_index: 0, score_0_100: 47.9, delta_from_prev: 0 }],
+          trend: "flat",
+        },
+      },
+    },
+    recommendations: [
+      {
+        rec_type: "copy_rewrite",
+        screen_index: 0,
+        evidence: {
+          circuit: "Attention",
+          region: "S_front_inf",
+          activation_score: 74.3,
+          score_rank: "High",
+        },
+        before: "Buy now",
+        after: "Start your free trial",
+        rationale: "The CTA needs a more concrete reward.",
+      },
+      {
+        rec_type: "layout_flag",
+        screen_index: 0,
+        evidence: {
+          circuit: "Memory Encoding",
+          region: "G_oc-temp_med-Parahip",
+          activation_score: 63.1,
+          score_rank: "Moderate",
+        },
+        element_description: "Hero CTA block",
+        rationale: "The CTA competes with the hero art.",
+      },
+    ],
+    pathway: {
+      selected_pathway: "text",
+      slideshow_path: null,
+      durations: [],
+    },
+  };
+}
+
 const jobResponses = new Map<string, MockJobResponse>();
 
 export function resetJobResponses() {
@@ -48,6 +143,16 @@ export function setJobResponse(
     ...response,
     job_id: jobId,
   });
+}
+
+export function setFixtureDoneJob(jobId: string) {
+  setJobResponse(jobId, {
+    status: "DONE",
+    queue_position: null,
+    stage: "recommendations",
+    result: buildFixtureResult(),
+    error: null,
+  } satisfies Partial<JobStatusResponse>);
 }
 
 resetJobResponses();
@@ -131,9 +236,10 @@ export const handlers = [
   http.post("http://localhost:8000/content/static", () =>
     HttpResponse.json({ content_id: "c-static-1", content_type: "static" }, { status: 201 }),
   ),
-  http.post("http://localhost:8000/analyze", () =>
-    HttpResponse.json({ job_id: "job-1", status: "PENDING" }, { status: 201 }),
-  ),
+  http.post("http://localhost:8000/analyze", () => {
+    setFixtureDoneJob("job-1");
+    return HttpResponse.json({ job_id: "job-1", status: "PENDING" }, { status: 201 });
+  }),
   http.get("http://localhost:8000/jobs/:id", ({ params }) => {
     const jobId = String(params.id);
     const response = jobResponses.get(jobId) ?? createDefaultJobResponse(jobId);
