@@ -29,7 +29,9 @@ describe("computeColorBuffer", () => {
 
     expect(result).toHaveLength(20484 * 3);
     expect(Array.from(result.slice(0, 3))).not.toEqual([0.1, 0.2, 0.3]);
-    expect(Array.from(result.slice(9, 12))).toEqual([0.1, 0.2, 0.3]);
+    expect(result[9]).toBeCloseTo(0.1);
+    expect(result[10]).toBeCloseTo(0.2);
+    expect(result[11]).toBeCloseTo(0.3);
   });
 
   it("uses the 20th percentile threshold to fall back to the neutral color", () => {
@@ -56,7 +58,22 @@ describe("computeColorBuffer", () => {
       peakColor: [0.91, 0.82, 0.73],
     });
 
-    expect(Array.from(result.slice(0, 3))).toEqual([0.11, 0.22, 0.33]);
+    expect(result[0]).toBeCloseTo(0.11);
+    expect(result[1]).toBeCloseTo(0.22);
+    expect(result[2]).toBeCloseTo(0.33);
     expect(Array.from(result.slice(3, 6))).not.toEqual([0.11, 0.22, 0.33]);
+  });
+
+  it("always returns exactly 61452 float entries", () => {
+    const result = computeColorBuffer({
+      activations: new Float32Array(20484).fill(0.25),
+      circuitOfLabelIndex: [null, "Attention"],
+      vertexToLabelIndex: Array.from({ length: 20484 }, () => 1),
+      activeCircuit: "Attention",
+      baseColor: [0.2, 0.2, 0.2],
+      peakColor: [0.8, 0.8, 0.8],
+    });
+
+    expect(result).toHaveLength(61452);
   });
 });

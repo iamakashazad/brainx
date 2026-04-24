@@ -140,8 +140,11 @@ export const handlers = [
     return HttpResponse.json(response);
   }),
   http.get("http://localhost:8000/jobs/:id/activations/:screen", () => {
-    const bytes = new Uint8Array(20484 * 4);
-    return new HttpResponse(bytes, {
+    const values = new Float32Array(20484);
+    for (let index = 0; index < values.length; index += 1) {
+      values[index] = index * 0.0001;
+    }
+    return new HttpResponse(values, {
       status: 200,
       headers: {
         "Content-Type": "application/octet-stream",

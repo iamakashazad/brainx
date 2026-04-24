@@ -28,4 +28,11 @@ describe("CircuitScoreBar", () => {
     expect(container.innerHTML).toContain("--chart-5");
     expect(container.innerHTML).toContain("font-mono");
   });
+
+  it("renders the numeric score in a mono element", () => {
+    const { container } = render(<CircuitScoreBar circuit="Attention" score={77} />);
+
+    expect(screen.getByText("77.0")).toBeInTheDocument();
+    expect(container.querySelector(".font-mono")).not.toBeNull();
+  });
 });

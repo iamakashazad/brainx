@@ -1,11 +1,15 @@
+import type React from "react";
 import { render, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useWizardStore } from "@/stores/wizardStore";
 import { BrainCanvas } from "../BrainCanvas";
 
 const activation = new Float32Array(20484).fill(0.5);
-const computeColorBuffer = vi.fn(() => new Float32Array(20484 * 3));
-const useActivation = vi.fn(() => ({ data: activation, isLoading: false }));
+const computeColorBuffer = vi.fn((_options: unknown) => new Float32Array(20484 * 3));
+const useActivation = vi.fn((_jobId: string | null, _screenIndex: number) => ({
+  data: activation,
+  isLoading: false,
+}));
 
 vi.mock("@react-three/fiber", () => ({
   Canvas: ({ children }: { children: React.ReactNode }) => <div data-testid="brain-canvas">{children}</div>,
@@ -17,28 +21,32 @@ vi.mock("@react-three/drei", () => ({
 }));
 
 vi.mock("../useActivation", () => ({
-  useActivation: (...args: unknown[]) => useActivation(...args),
+  useActivation: (jobId: string | null, screenIndex: number) => useActivation(jobId, screenIndex),
 }));
 
 vi.mock("../useMeshGeometry", () => ({
   useMeshGeometry: () => ({
-    positions: new Float32Array(20484 * 3),
-    indices: new Uint32Array(12),
+    data: {
+      positions: new Float32Array(20484 * 3),
+      indices: new Uint32Array(12),
+    },
     isLoading: false,
   }),
 }));
 
 vi.mock("../useParcellation", () => ({
   useParcellation: () => ({
-    labels: ["Unknown", "Attention"],
-    circuitOfLabelIndex: [null, "Attention"],
-    vertexToLabelIndex: Array.from({ length: 20484 }, () => 1),
+    data: {
+      labels: ["Unknown", "Attention"],
+      circuitOfLabelIndex: [null, "Attention"],
+      vertexToLabelIndex: Array.from({ length: 20484 }, () => 1),
+    },
     isLoading: false,
   }),
 }));
 
 vi.mock("../colorBuffer", () => ({
-  computeColorBuffer: (...args: unknown[]) => computeColorBuffer(...args),
+  computeColorBuffer: (options: unknown) => computeColorBuffer(options),
 }));
 
 describe("BrainCanvas", () => {

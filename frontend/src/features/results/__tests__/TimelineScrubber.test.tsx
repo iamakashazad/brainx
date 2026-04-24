@@ -1,5 +1,4 @@
-import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TimelineScrubber } from "../TimelineScrubber";
 
@@ -26,39 +25,46 @@ describe("TimelineScrubber", () => {
 
   it("auto-plays once on first mount and then lets the user drag to a target screen", async () => {
     const onChange = vi.fn();
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
     render(<TimelineScrubber screenCount={4} value={0} onChange={onChange} />);
 
-    vi.advanceTimersByTime(2400);
+    act(() => {
+      vi.advanceTimersByTime(2400);
+    });
     expect(onChange).toHaveBeenCalledWith(0);
     expect(onChange).toHaveBeenCalledWith(1);
     expect(onChange).toHaveBeenCalledWith(2);
     expect(onChange).toHaveBeenCalledWith(3);
 
-    await user.click(screen.getByRole("slider"));
+    fireEvent.pointerDown(screen.getByRole("slider"));
 
     expect(screen.getByRole("slider")).toHaveAttribute("aria-valuetext", "Screen 1 of 4");
   });
 
-  it("cancels autoplay after user interaction and respects reduced motion", async () => {
+  it("cancels autoplay after user interaction and respects reduced motion", () => {
     const onChange = vi.fn();
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
-    const { rerender } = render(<TimelineScrubber screenCount={4} value={0} onChange={onChange} />);
+    render(<TimelineScrubber screenCount={4} value={0} onChange={onChange} />);
+    onChange.mockClear();
 
-    await user.pointer({
-      target: screen.getByRole("slider"),
-      keys: "[MouseLeft]",
+    fireEvent.pointerDown(screen.getByRole("slider"));
+
+    act(() => {
+      vi.advanceTimersByTime(2400);
+    });
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("skips autoplay entirely when prefers-reduced-motion is enabled", () => {
+    const onChange = vi.fn();
+    useReducedMotion.mockReturnValue(true);
+
+    render(<TimelineScrubber screenCount={4} value={0} onChange={onChange} />);
+
+    act(() => {
+      vi.advanceTimersByTime(2400);
     });
 
-    vi.advanceTimersByTime(2400);
-    expect(onChange).not.toHaveBeenCalled();
-
-    useReducedMotion.mockReturnValue(true);
-    rerender(<TimelineScrubber screenCount={4} value={0} onChange={onChange} />);
-
-    vi.advanceTimersByTime(2400);
     expect(onChange).not.toHaveBeenCalled();
   });
 });

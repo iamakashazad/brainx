@@ -29,10 +29,10 @@ describe("CircuitSelector", () => {
       />,
     );
 
-    expect(screen.getAllByRole("button")).toHaveLength(5);
-    expect(screen.getByRole("button", { name: "Attention" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getAllByRole("radio")).toHaveLength(5);
+    expect(screen.getByRole("radio", { name: "Attention" })).toHaveAttribute("aria-checked", "true");
 
-    await user.click(screen.getByRole("button", { name: "Memory Encoding" }));
+    await user.click(screen.getByRole("radio", { name: "Memory Encoding" }));
 
     expect(useWizardStore.getState().setActiveCircuit).toHaveBeenCalledWith("Memory Encoding");
   });
