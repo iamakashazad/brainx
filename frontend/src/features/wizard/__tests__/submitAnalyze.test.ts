@@ -1,12 +1,25 @@
+import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { useWizardStore } from "@/stores/wizardStore";
 import { server } from "../../../../tests/msw/server";
-import { WizardShell } from "../WizardShell";
+import { useSubmitAnalyze } from "../useSubmitAnalyze";
 
-function renderWizardShell() {
+function AnalyzeHarness() {
+  const mutation = useSubmitAnalyze();
+  return React.createElement(
+    "button",
+    {
+      type: "button",
+      onClick: () => mutation.mutate(),
+    },
+    "Analyze Content",
+  );
+}
+
+function renderAnalyzeHarness() {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
@@ -15,9 +28,11 @@ function renderWizardShell() {
   });
 
   render(
-    <QueryClientProvider client={queryClient}>
-      <WizardShell />
-    </QueryClientProvider>,
+    React.createElement(
+      QueryClientProvider,
+      { client: queryClient },
+      React.createElement(AnalyzeHarness),
+    ),
   );
 }
 
@@ -48,7 +63,7 @@ describe("analyze submission", () => {
       }),
     );
 
-    renderWizardShell();
+    renderAnalyzeHarness();
 
     await user.click(screen.getByRole("button", { name: "Analyze Content" }));
 
@@ -59,7 +74,7 @@ describe("analyze submission", () => {
 
   it("stores the returned job id and advances to step three", async () => {
     const user = userEvent.setup();
-    renderWizardShell();
+    renderAnalyzeHarness();
 
     await user.click(screen.getByRole("button", { name: "Analyze Content" }));
 
@@ -92,7 +107,7 @@ describe("analyze submission", () => {
       secondaryRecLocationCursor: 0,
     });
 
-    renderWizardShell();
+    renderAnalyzeHarness();
 
     await user.click(screen.getByRole("button", { name: "Analyze Content" }));
 
