@@ -1,4 +1,5 @@
 import { useWizardStore } from "@/stores/wizardStore";
+import { waitFor } from "@testing-library/react";
 
 describe("wizard store persistence", () => {
   beforeEach(() => {

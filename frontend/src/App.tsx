@@ -1,3 +1,10 @@
+import { Route, Routes } from "react-router-dom";
+import { WizardShell } from "./features/wizard/WizardShell";
+
 export function App() {
-  return <div>BrainX Phase 4 - loading...</div>;
+  return (
+    <Routes>
+      <Route path="*" element={<WizardShell />} />
+    </Routes>
+  );
 }
