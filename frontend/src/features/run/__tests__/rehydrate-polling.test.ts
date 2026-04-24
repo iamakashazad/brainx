@@ -44,9 +44,45 @@ function buildJobResponse(overrides: Partial<JobStatusResponse> = {}): JobStatus
   };
 }
 
+function buildAnalysisResult() {
+  return {
+    schema_version: 1 as const,
+    simulation: {},
+    overlays: [],
+    activations: [],
+    roi: [
+      {
+        screen_index: 0,
+        circuits: {
+          Attention: { score: 0, peak: 0 },
+          "Cognitive Load": { score: 0, peak: 0 },
+          "Emotional Response": { score: 0, peak: 0 },
+          "Memory Encoding": { score: 0, peak: 0 },
+          Reward: { score: 0, peak: 0 },
+        },
+        regions: [],
+      },
+    ],
+    flow_continuity: {
+      circuits: {
+        Attention: { per_screen: [], trend: "flat" as const },
+        "Cognitive Load": { per_screen: [], trend: "flat" as const },
+        "Emotional Response": { per_screen: [], trend: "flat" as const },
+        "Memory Encoding": { per_screen: [], trend: "flat" as const },
+        Reward: { per_screen: [], trend: "flat" as const },
+      },
+    },
+    recommendations: [],
+    pathway: {
+      selected_pathway: "text" as const,
+      slideshow_path: null,
+      durations: [],
+    },
+  };
+}
+
 describe("useJobRehydrate", () => {
   beforeEach(() => {
-    vi.useFakeTimers();
     localStorage.clear();
     const setStep = vi.fn();
     useWizardStore.setState({
@@ -72,7 +108,7 @@ describe("useJobRehydrate", () => {
   });
 
   afterEach(() => {
-    vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   it("rehydrates once and jumps directly to results when the persisted job is already DONE", async () => {
@@ -85,20 +121,7 @@ describe("useJobRehydrate", () => {
       buildJobResponse({
         status: "DONE",
         queue_position: null,
-        result: {
-          schema_version: 1,
-          simulation: {},
-          overlays: [],
-          activations: [],
-          roi: [],
-          flow_continuity: { circuits: {} as never },
-          recommendations: [],
-          pathway: {
-            selected_pathway: "text",
-            slideshow_path: null,
-            durations: [],
-          },
-        },
+        result: buildAnalysisResult(),
       }),
     );
 
@@ -106,10 +129,11 @@ describe("useJobRehydrate", () => {
 
     await waitFor(() => {
       expect(result.current.isRehydrating).toBe(false);
-      expect(fetchSpy).toHaveBeenCalledTimes(1);
-      expect(fetchSpy.mock.calls[0]?.[0]).toContain("/jobs/job-1");
-      expect(setStep).toHaveBeenCalledWith(4);
     });
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(String(fetchSpy.mock.calls[0]?.[0])).toContain("/jobs/job-1");
+    expect(setStep).toHaveBeenCalledWith(4);
   });
 
   it("rehydrates once and leaves the run step active when the job is still RUNNING", async () => {
@@ -130,9 +154,9 @@ describe("useJobRehydrate", () => {
 
     await waitFor(() => {
       expect(result.current.isRehydrating).toBe(false);
-      expect(fetchSpy).toHaveBeenCalledTimes(1);
     });
 
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
     expect(setStep).not.toHaveBeenCalled();
   });
 });

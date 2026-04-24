@@ -43,14 +43,50 @@ function buildJobResponse(overrides: Partial<JobStatusResponse> = {}): JobStatus
   };
 }
 
+function buildAnalysisResult() {
+  return {
+    schema_version: 1 as const,
+    simulation: {},
+    overlays: [],
+    activations: [],
+    roi: [
+      {
+        screen_index: 0,
+        circuits: {
+          Attention: { score: 0, peak: 0 },
+          "Cognitive Load": { score: 0, peak: 0 },
+          "Emotional Response": { score: 0, peak: 0 },
+          "Memory Encoding": { score: 0, peak: 0 },
+          Reward: { score: 0, peak: 0 },
+        },
+        regions: [],
+      },
+    ],
+    flow_continuity: {
+      circuits: {
+        Attention: { per_screen: [], trend: "flat" as const },
+        "Cognitive Load": { per_screen: [], trend: "flat" as const },
+        "Emotional Response": { per_screen: [], trend: "flat" as const },
+        "Memory Encoding": { per_screen: [], trend: "flat" as const },
+        Reward: { per_screen: [], trend: "flat" as const },
+      },
+    },
+    recommendations: [],
+    pathway: {
+      selected_pathway: "text" as const,
+      slideshow_path: null,
+      durations: [],
+    },
+  };
+}
+
 describe("useJobStatus", () => {
   beforeEach(() => {
-    vi.useFakeTimers();
     setJobResponse("job-1", buildJobResponse());
   });
 
   afterEach(() => {
-    vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   it("returns pending job data and polls every 2000ms", async () => {
@@ -67,7 +103,7 @@ describe("useJobStatus", () => {
       });
     });
 
-    await vi.advanceTimersByTimeAsync(2000);
+    await new Promise((resolve) => setTimeout(resolve, 2100));
 
     await waitFor(() => {
       expect(fetchSpy).toHaveBeenCalledTimes(2);
@@ -88,34 +124,23 @@ describe("useJobStatus", () => {
       buildJobResponse({
         status: "DONE",
         queue_position: null,
-        result: {
-          schema_version: 1,
-          simulation: {},
-          overlays: [],
-          activations: [],
-          roi: [],
-          flow_continuity: { circuits: {} as never },
-          recommendations: [],
-          pathway: {
-            selected_pathway: "text",
-            slideshow_path: null,
-            durations: [],
-          },
-        },
+        result: buildAnalysisResult(),
       }),
     );
 
-    await vi.advanceTimersByTimeAsync(2000);
+    await waitFor(() => {
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+    }, { timeout: 3000 });
 
     await waitFor(() => {
       expect(result.current.data?.status).toBe("DONE");
     });
 
     const doneCallCount = fetchSpy.mock.calls.length;
-    await vi.advanceTimersByTimeAsync(4000);
+    await new Promise((resolve) => setTimeout(resolve, 2100));
 
     expect(fetchSpy).toHaveBeenCalledTimes(doneCallCount);
-  });
+  }, 10000);
 
   it("stops polling after the backend reports ERROR", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
@@ -135,7 +160,9 @@ describe("useJobStatus", () => {
       }),
     );
 
-    await vi.advanceTimersByTimeAsync(2000);
+    await waitFor(() => {
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+    }, { timeout: 3000 });
 
     await waitFor(() => {
       expect(result.current.data?.status).toBe("ERROR");
@@ -143,10 +170,10 @@ describe("useJobStatus", () => {
     });
 
     const errorCallCount = fetchSpy.mock.calls.length;
-    await vi.advanceTimersByTimeAsync(4000);
+    await new Promise((resolve) => setTimeout(resolve, 2100));
 
     expect(fetchSpy).toHaveBeenCalledTimes(errorCallCount);
-  });
+  }, 10000);
 
   it("stops dispatching fetches after unmount", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
@@ -159,7 +186,7 @@ describe("useJobStatus", () => {
 
     unmount();
     const callCountAtUnmount = fetchSpy.mock.calls.length;
-    await vi.advanceTimersByTimeAsync(4000);
+    await new Promise((resolve) => setTimeout(resolve, 4100));
 
     expect(fetchSpy).toHaveBeenCalledTimes(callCountAtUnmount);
   });

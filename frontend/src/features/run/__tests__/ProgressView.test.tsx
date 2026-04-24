@@ -41,9 +41,45 @@ function buildJobResponse(overrides: Partial<JobStatusResponse> = {}): JobStatus
   };
 }
 
+function buildAnalysisResult() {
+  return {
+    schema_version: 1 as const,
+    simulation: {},
+    overlays: [],
+    activations: [],
+    roi: [
+      {
+        screen_index: 0,
+        circuits: {
+          Attention: { score: 0, peak: 0 },
+          "Cognitive Load": { score: 0, peak: 0 },
+          "Emotional Response": { score: 0, peak: 0 },
+          "Memory Encoding": { score: 0, peak: 0 },
+          Reward: { score: 0, peak: 0 },
+        },
+        regions: [],
+      },
+    ],
+    flow_continuity: {
+      circuits: {
+        Attention: { per_screen: [], trend: "flat" as const },
+        "Cognitive Load": { per_screen: [], trend: "flat" as const },
+        "Emotional Response": { per_screen: [], trend: "flat" as const },
+        "Memory Encoding": { per_screen: [], trend: "flat" as const },
+        Reward: { per_screen: [], trend: "flat" as const },
+      },
+    },
+    recommendations: [],
+    pathway: {
+      selected_pathway: "text" as const,
+      slideshow_path: null,
+      durations: [],
+    },
+  };
+}
+
 describe("ProgressView", () => {
   beforeEach(() => {
-    vi.useFakeTimers();
     localStorage.clear();
     const setStep = vi.fn();
 
@@ -71,7 +107,7 @@ describe("ProgressView", () => {
   });
 
   afterEach(() => {
-    vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   it("renders the mapped active stage copy from the backend stage", async () => {
@@ -80,17 +116,25 @@ describe("ProgressView", () => {
 
     render(<ProgressView />, { wrapper: Wrapper });
 
-    expect(await screen.findByText("Simulating how your persona experiences this content…")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(
+        screen.getByRole("heading", {
+          name: "Simulating how your persona experiences this content…",
+        }),
+      ).toBeInTheDocument();
+    });
   });
 
   it("shows the queue badge when queue_position is positive and hides it otherwise", async () => {
     const Wrapper = createWrapper();
     const { rerender } = render(<ProgressView />, { wrapper: Wrapper });
 
-    expect(await screen.findByText("Position 1 in queue")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText("Position 1 in queue")).toBeInTheDocument();
+    });
 
     setJobResponse("job-1", buildJobResponse({ queue_position: 0 }));
-    await vi.advanceTimersByTimeAsync(2000);
+    await new Promise((resolve) => setTimeout(resolve, 2100));
     rerender(<ProgressView />);
 
     await waitFor(() => {
@@ -110,24 +154,11 @@ describe("ProgressView", () => {
       buildJobResponse({
         status: "DONE",
         queue_position: null,
-        result: {
-          schema_version: 1,
-          simulation: {},
-          overlays: [],
-          activations: [],
-          roi: [],
-          flow_continuity: { circuits: {} as never },
-          recommendations: [],
-          pathway: {
-            selected_pathway: "text",
-            slideshow_path: null,
-            durations: [],
-          },
-        },
+        result: buildAnalysisResult(),
       }),
     );
 
-    await vi.advanceTimersByTimeAsync(2000);
+    await new Promise((resolve) => setTimeout(resolve, 2100));
 
     await waitFor(() => {
       expect(setStep).toHaveBeenCalledTimes(1);
@@ -148,7 +179,9 @@ describe("ProgressView", () => {
 
     render(<ProgressView />, { wrapper: Wrapper });
 
-    expect(await screen.findByText("Analysis failed")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText("Analysis failed")).toBeInTheDocument();
+    });
     expect(
       screen.getByText(
         "Something went wrong during brain inference. Check that your content uploaded correctly, then try again.",
@@ -158,7 +191,7 @@ describe("ProgressView", () => {
   });
 
   it("calls the retry handler and go-back action from the failure state", async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup();
     const Wrapper = createWrapper();
     const setStep = vi.fn();
     useWizardStore.setState({ setStep });
@@ -173,7 +206,11 @@ describe("ProgressView", () => {
 
     render(<ProgressView />, { wrapper: Wrapper });
 
-    const retryButton = await screen.findByRole("button", { name: "Try Again" });
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Try Again" })).toBeInTheDocument();
+    });
+
+    const retryButton = screen.getByRole("button", { name: "Try Again" });
     const goBackButton = screen.getByRole("button", { name: "Go Back" });
 
     await user.click(retryButton);

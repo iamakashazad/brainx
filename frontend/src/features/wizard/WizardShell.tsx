@@ -1,5 +1,6 @@
 import { ContentTypeTabs } from "@/features/content/ContentTypeTabs";
 import { PersonaLibrary } from "@/features/persona/PersonaLibrary";
+import { ProgressView } from "@/features/run/ProgressView";
 import { useWizardStore } from "@/stores/wizardStore";
 import { WizardStep } from "./WizardStep";
 import { WizardStepper } from "./WizardStepper";
@@ -12,7 +13,7 @@ function getStepContent(step: 1 | 2 | 3 | 4) {
     case 2:
       return <ContentTypeTabs />;
     case 3:
-      return <div className="text-sm text-muted-foreground">Run - delivered by plan 04-02</div>;
+      return <ProgressView />;
     case 4:
       return <div className="text-sm text-muted-foreground">Results - delivered by plan 04-03</div>;
     default:
@@ -27,6 +28,10 @@ export function WizardShell() {
   const jobId = useWizardStore((state) => state.jobId);
   const setStep = useWizardStore((state) => state.setStep);
   const submitAnalyzeMutation = useSubmitAnalyze();
+
+  if (currentStep === 3) {
+    return <ProgressView />;
+  }
 
   const canNavigateToStep = (step: 1 | 2 | 3 | 4) => {
     if (step === 1) {
