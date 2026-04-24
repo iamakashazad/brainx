@@ -10,7 +10,7 @@ from backend.core.config import settings
 from backend.core.database import init_db
 from backend.core import queue as queue_manager
 from backend.ml.tribe_loader import load_model
-from backend.routers import analyze, content, health, jobs, personas
+from backend.routers import activations, analyze, content, health, jobs, personas
 
 
 @asynccontextmanager
@@ -44,6 +44,7 @@ def create_app() -> FastAPI:
     )
     app.include_router(health.router, tags=["health"])
     app.include_router(jobs.router, tags=["jobs"])
+    app.include_router(activations.router, tags=["activations"])
     app.include_router(personas.router, prefix="/personas", tags=["personas"])
     app.include_router(content.router, prefix="/content", tags=["content"])
     app.include_router(analyze.router, prefix="/analyze", tags=["analyze"])
