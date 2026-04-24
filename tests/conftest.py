@@ -27,6 +27,7 @@ from backend.models.job import Base  # noqa: E402
 from backend.models import content as _content  # noqa: E402,F401
 from backend.models import persona as _persona  # noqa: E402,F401
 from backend.models.recommendations import Recommendations  # noqa: E402
+from backend.models.job import Job  # noqa: E402
 from backend.models.schemas import PersonaRead  # noqa: E402
 
 
@@ -276,3 +277,87 @@ def deepseek_mock_hallucinate(respx_mock_phase2):
         )
     )
     return respx_mock_phase2
+
+
+@pytest_asyncio.fixture
+async def seed_done_job(tmp_path: Path):
+    async def _seed(
+        *,
+        screen_count: int = 1,
+        job_id: str = "job-done",
+    ) -> tuple[str, Path, np.ndarray]:
+        job_dir = tmp_path / "activations" / job_id
+        job_dir.mkdir(parents=True, exist_ok=True)
+
+        manifest: list[dict[str, object]] = []
+        first_array: np.ndarray | None = None
+        first_path: Path | None = None
+
+        for screen_index in range(screen_count):
+            raw = (
+                np.arange(4 * 20484, dtype=np.float32).reshape(4, 20484)
+                + np.float32(screen_index * 0.25)
+            )
+            path = job_dir / f"screen_{screen_index + 1}.npy"
+            np.save(path, raw)
+            manifest.append(
+                {
+                    "screen_index": screen_index,
+                    "path": path.as_posix(),
+                    "shape": list(raw.shape),
+                    "timesteps": int(raw.shape[0]),
+                }
+            )
+            if first_array is None:
+                first_array = raw
+                first_path = path
+
+        envelope = {
+            "schema_version": 1,
+            "simulation": {},
+            "overlays": [],
+            "activations": manifest,
+            "roi": [],
+            "flow_continuity": {"circuits": {}},
+            "recommendations": [],
+            "pathway": {
+                "selected_pathway": "text",
+                "slideshow_path": None,
+                "durations": [],
+            },
+        }
+
+        async with database.async_session() as session:
+            session.add(
+                Job(
+                    id=job_id,
+                    status="DONE",
+                    result_json=envelope,
+                    input_type="text",
+                )
+            )
+            await session.commit()
+
+        assert first_array is not None
+        assert first_path is not None
+        return job_id, first_path, first_array
+
+    return _seed
+
+
+@pytest_asyncio.fixture
+async def seed_pending_job():
+    async def _seed(*, job_id: str = "job-pending") -> str:
+        async with database.async_session() as session:
+            session.add(
+                Job(
+                    id=job_id,
+                    status="PENDING",
+                    input_type="text",
+                )
+            )
+            await session.commit()
+
+        return job_id
+
+    return _seed
