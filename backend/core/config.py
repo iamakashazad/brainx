@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     vision_provider: str = "replicate"
     vision_model: str = "deepseek-ai/deepseek-vl2"
     uploads_dir: Path = Path("./uploads")
+    job_timeout_seconds: int = 3600
 
     model_config = SettingsConfigDict(
         env_file=".env",

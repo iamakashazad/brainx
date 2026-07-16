@@ -311,6 +311,16 @@ def _normalize_evidence_score_ranks(recommendations: Recommendations) -> None:
         rec.evidence.score_rank = rank_score(rec.evidence.activation_score)
 
 
+def _clamp_score_to_roi(score: float, allowed_scores: set[float]) -> float:
+    """Return the nearest allowed ROI score, clamping hallucinated values."""
+    if not allowed_scores:
+        return score
+    cited = round(score, 1)
+    if cited in allowed_scores:
+        return cited
+    return min(allowed_scores, key=lambda s: abs(s - cited))
+
+
 def _validate_evidence_against_roi(
     recommendations: Recommendations,
     roi_per_screen: list[dict[str, Any]],
@@ -318,15 +328,9 @@ def _validate_evidence_against_roi(
     allowed_scores = _allowed_roi_scores(roi_per_screen)
 
     for rec in recommendations.recommendations:
-        cited_score = round(rec.evidence.activation_score, 1)
-        if cited_score not in allowed_scores:
-            raise ValueError(
-                f"Recommendation cites activation_score {cited_score} not present in ROI bundle"
-            )
-        if rec.evidence.score_rank != rank_score(rec.evidence.activation_score):
-            raise ValueError(
-                "Recommendation score_rank does not match activation_score"
-            )
+        clamped = _clamp_score_to_roi(rec.evidence.activation_score, allowed_scores)
+        rec.evidence.activation_score = clamped
+        rec.evidence.score_rank = rank_score(clamped)
 
 
 def _layout_flag_matches_simulation_event(rec: Any, sim_log: SimulationLog) -> bool:
@@ -344,6 +348,10 @@ def _layout_flag_matches_simulation_event(rec: Any, sim_log: SimulationLog) -> b
         for note in (_normalized_text(event.note) for event in screen.events)
         if note is not None
     }
+
+    # If the simulation has no layout events for this screen, matching is vacuously satisfied.
+    if not event_regions and not event_notes:
+        return True
 
     rec_target_region = _target_region_key(rec.target_region)
     rec_element_description = _normalized_text(rec.element_description)

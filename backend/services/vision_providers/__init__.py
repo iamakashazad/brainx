@@ -8,7 +8,4 @@ from backend.services.vision_providers.replicate import ReplicateVL2Backend
 def get_provider() -> VisionProvider:
     if settings.vision_provider == "replicate":
         return ReplicateVL2Backend()
-    raise ValueError(f"unknown vision provider: {settings.vision_provider}")
-
-
-__all__ = ["VisionProvider", "ReplicateVL2Backend", "get_provider"]
+    raise ValueError(f"Unsupported vision provider: {settings.vision_provider}")

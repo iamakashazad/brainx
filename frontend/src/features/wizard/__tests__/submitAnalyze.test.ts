@@ -2,6 +2,7 @@ import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import { http, HttpResponse } from "msw";
 import { useWizardStore } from "@/stores/wizardStore";
 import { server } from "../../../../tests/msw/server";
@@ -31,7 +32,7 @@ function renderAnalyzeHarness() {
     React.createElement(
       QueryClientProvider,
       { client: queryClient },
-      React.createElement(AnalyzeHarness),
+      React.createElement(MemoryRouter, null, React.createElement(AnalyzeHarness)),
     ),
   );
 }

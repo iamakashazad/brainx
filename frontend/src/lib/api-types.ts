@@ -117,10 +117,10 @@ export type Recommendation = {
     y_ratio: number;
     width_ratio: number;
     height_ratio: number;
-  };
-  element_description?: string;
-  before?: string;
-  after?: string;
+  } | null;
+  element_description?: string | null;
+  before?: string | null;
+  after?: string | null;
   rationale: string;
 };
 
@@ -158,9 +158,22 @@ export type AnalysisResult = {
 export type JobStatusResponse = {
   job_id: string;
   status: JobStatus;
+  persona_id: string | null;
   queue_position: number | null;
   stage: StageValue | null;
   result: AnalysisResult | null;
   error: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+  runtime_seconds: number | null;
+  inference_processes: number;
+  stale_inference_processes: number;
+  status_message: string | null;
+};
+
+export type JobSummary = {
+  job_id: string;
+  status: JobStatus;
+  persona_id: string | null;
   created_at: string | null;
 };

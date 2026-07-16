@@ -17,12 +17,13 @@ export function BrainPresetButtons({
           type="button"
           aria-label={`View: ${preset}`}
           onClick={() => onPresetChange(preset)}
-          className={[
-            "min-h-11 rounded-xl border border-border px-3 py-2 text-sm font-semibold transition",
-            activePreset === preset
-              ? "bg-primary text-primary-foreground"
-              : "bg-card text-card-foreground hover:bg-accent",
-          ].join(" ")}
+          className="rounded-full px-4 py-1.5 text-sm font-medium transition"
+          style={{
+            background: activePreset === preset ? "var(--primary)" : "transparent",
+            color: activePreset === preset ? "var(--primary-foreground)" : "var(--muted-foreground)",
+            border: activePreset === preset ? "none" : "1px solid var(--border-medium)",
+            borderRadius: "var(--radius-full)",
+          }}
         >
           {preset}
         </button>

@@ -3,6 +3,7 @@ from __future__ import annotations
 import datetime as dt
 
 from fastapi import APIRouter, HTTPException, Response, status
+from pydantic import BaseModel as PydanticBaseModel
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
@@ -12,6 +13,102 @@ from backend.models.schemas import PersonaCreate, PersonaRead, PersonaUpdate
 
 router = APIRouter()
 
+# ── AI suggest ────────────────────────────────────────────────────────────────
+
+class AISuggestRequest(PydanticBaseModel):
+    name: str
+    age: int
+    role: str
+    background: str | None = None
+    field: str
+
+
+class _ListSuggestion(PydanticBaseModel):
+    value: list[str]
+
+
+class _StrSuggestion(PydanticBaseModel):
+    value: str
+
+
+class AISuggestResponse(PydanticBaseModel):
+    value: str | list[str]
+
+
+_FIELD_IS_LIST = {
+    "psychographics.goals",
+    "psychographics.values",
+    "psychographics.motivations",
+}
+
+_FIELD_PROMPTS: dict[str, str] = {
+    "psychographics.goals": (
+        'Suggest 3–5 concise professional/personal goals. Return JSON: {"value": ["goal1", ...]}'
+    ),
+    "psychographics.values": (
+        'Suggest 3–5 core values this persona holds. Return JSON: {"value": ["value1", ...]}'
+    ),
+    "psychographics.motivations": (
+        'Suggest 3–5 key motivations. Return JSON: {"value": ["motivation1", ...]}'
+    ),
+    "cognitive_state.attention_span": (
+        "Choose attention span: short, medium, or long. "
+        'Return JSON: {"value": "medium"}'
+    ),
+    "cognitive_state.stress_level": (
+        "Choose stress level: low, moderate, or high. "
+        'Return JSON: {"value": "moderate"}'
+    ),
+    "cognitive_state.tech_literacy": (
+        "Choose tech literacy: novice, intermediate, or expert. "
+        'Return JSON: {"value": "intermediate"}'
+    ),
+    "environment.device": (
+        "Choose primary device: mobile, tablet, or desktop. "
+        'Return JSON: {"value": "desktop"}'
+    ),
+    "environment.location": (
+        "Choose typical location: commute, home, office, store, or other. "
+        'Return JSON: {"value": "office"}'
+    ),
+    "environment.ambient": (
+        "Describe the ambient environment in one short phrase (noise, setting). "
+        'Return JSON: {"value": "Quiet home office, minimal distractions"}'
+    ),
+}
+
+_SYSTEM_PROMPT = (
+    "You are an expert UX researcher. Given basic persona demographics, suggest realistic "
+    "attribute values. Respond with valid JSON only — no explanation, no markdown."
+)
+
+
+@router.post("/ai-suggest", response_model=AISuggestResponse)
+async def ai_suggest_persona_field(payload: AISuggestRequest) -> AISuggestResponse:
+    from backend.services.deepseek_client import deepseek_text_completion
+
+    if payload.field not in _FIELD_PROMPTS:
+        raise HTTPException(status_code=400, detail=f"Unknown field: {payload.field}")
+
+    ctx_lines = [
+        f"Persona name: {payload.name}",
+        f"Age: {payload.age}",
+        f"Role: {payload.role}",
+    ]
+    if payload.background:
+        ctx_lines.append(f"Background: {payload.background}")
+    context = "\n".join(ctx_lines)
+    user_prompt = f"{context}\n\n{_FIELD_PROMPTS[payload.field]}"
+
+    if payload.field in _FIELD_IS_LIST:
+        result = await deepseek_text_completion(_SYSTEM_PROMPT, user_prompt, _ListSuggestion)
+        return AISuggestResponse(value=result.value)
+    else:
+        result = await deepseek_text_completion(_SYSTEM_PROMPT, user_prompt, _StrSuggestion)
+        return AISuggestResponse(value=result.value)
+
+
+# ── CRUD ──────────────────────────────────────────────────────────────────────
 
 def _serialize(persona: Persona) -> PersonaRead:
     return PersonaRead(

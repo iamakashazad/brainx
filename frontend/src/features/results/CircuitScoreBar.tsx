@@ -11,14 +11,35 @@ export function CircuitScoreBar({
   const token = CIRCUIT_CHART_TOKEN[circuit];
 
   return (
-    <div className="space-y-2 rounded-2xl border border-border bg-card p-4 shadow-lg">
-      <div className="flex items-center justify-between gap-4">
-        <span className="text-sm font-semibold text-foreground">{circuit}</span>
-        <span className="font-mono text-sm text-muted-foreground">{score.toFixed(1)}</span>
+    <div
+      style={{
+        background: "var(--card)",
+        border: "1px solid var(--border)",
+        borderRadius: "var(--radius)",
+        padding: "16px",
+        boxShadow: "var(--shadow)",
+      }}
+    >
+      <div className="flex items-center justify-between gap-4 mb-3">
+        <span
+          className="text-sm font-medium"
+          style={{ color: "var(--foreground)" }}
+        >
+          {circuit}
+        </span>
+        <span
+          className="text-sm font-semibold"
+          style={{ color: "var(--muted-foreground)", fontFamily: "var(--font-mono)" }}
+        >
+          {score.toFixed(1)}
+        </span>
       </div>
-      <div className="h-5 rounded-full bg-muted">
+      <div
+        className="h-2 rounded-full overflow-hidden"
+        style={{ background: "var(--muted)" }}
+      >
         <div
-          className="h-5 rounded-full transition-[width] duration-400 ease-out"
+          className="h-2 rounded-full transition-[width] duration-500 ease-out"
           style={{
             width: `${score}%`,
             background: `linear-gradient(90deg, var(${token}) 0%, color-mix(in oklab, var(${token}) 40%, transparent) 100%)`,

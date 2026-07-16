@@ -8,9 +8,11 @@ export function useActivation(jobId: string | null, screenIndex: number) {
     enabled: Boolean(jobId),
     staleTime: Number.POSITIVE_INFINITY,
     queryFn: async ({ signal }) => {
-      const response = await fetch(`${API_BASE_URL}/jobs/${jobId}/activations/${screenIndex}`, {
-        signal,
-      });
+      const url =
+        jobId === "demo"
+          ? `/demo/activations/screen_${screenIndex + 1}.bin`
+          : `${API_BASE_URL}/jobs/${jobId}/activations/${screenIndex}`;
+      const response = await fetch(url, { signal });
       if (!response.ok) {
         throw new Error(`Activation fetch failed: ${response.status}`);
       }

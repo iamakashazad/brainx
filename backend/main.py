@@ -11,11 +11,16 @@ from backend.core.database import init_db
 from backend.core import queue as queue_manager
 from backend.ml.tribe_loader import load_model
 from backend.routers import activations, analyze, content, health, jobs, personas
+from backend.services.process_guard import cleanup_workspace_whisperx_processes
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
+    cleanup_workspace_whisperx_processes()
+    interrupted_count = await queue_manager.mark_interrupted_jobs()
+    if interrupted_count:
+        await queue_manager.sync_pending_queue_positions()
 
     try:
         app.state.tribe_model = await load_model(settings.model_cache_path, settings.device)
@@ -37,7 +42,14 @@ def create_app() -> FastAPI:
     app = FastAPI(title="BrainX", version="0.1.0", lifespan=lifespan)
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:5173", "http://localhost:3000"],
+        allow_origins=[
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://localhost:4173",
+            "http://127.0.0.1:4173",
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+        ],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

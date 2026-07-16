@@ -12,6 +12,10 @@ export const DISPLAY_COMPLETE = "Analysis complete";
 export const DISPLAY_FAILED_HEADING = "Analysis failed";
 export const DISPLAY_FAILED_BODY =
   "Something went wrong during brain inference. Check that your content uploaded correctly, then try again.";
+export const DISPLAY_TIMEOUT_BODY =
+  "Analysis timed out before it finished. Please try again — shorter content may process faster.";
+export const DISPLAY_INTERRUPTED_BODY =
+  "Analysis was interrupted before it finished. Start a new analysis to run it again.";
 
 /**
  * Ordered display stages for the run indicator. Terminal states stay display-only.
@@ -84,4 +88,18 @@ export function displayStatusForStage(status: JobStatus): string {
   }
 
   return "RUNNING";
+}
+
+export function displayFailureBodyFor(errorMessage: string | null | undefined): string {
+  const normalizedError = errorMessage?.toLowerCase() ?? "";
+
+  if (normalizedError.includes("timed out")) {
+    return DISPLAY_TIMEOUT_BODY;
+  }
+
+  if (normalizedError.includes("interrupted")) {
+    return DISPLAY_INTERRUPTED_BODY;
+  }
+
+  return DISPLAY_FAILED_BODY;
 }

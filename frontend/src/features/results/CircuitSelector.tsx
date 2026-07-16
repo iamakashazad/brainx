@@ -20,9 +20,7 @@ export function CircuitSelector({ circuits }: CircuitSelectorProps) {
   const setActiveCircuit = useWizardStore((state) => state.setActiveCircuit);
 
   useEffect(() => {
-    if (activeCircuit !== null) {
-      return;
-    }
+    if (activeCircuit !== null) return;
 
     let highest: CircuitName = "Attention";
     let highestScore = Number.NEGATIVE_INFINITY;
@@ -41,9 +39,7 @@ export function CircuitSelector({ circuits }: CircuitSelectorProps) {
       type="single"
       value={activeCircuit ?? ""}
       onValueChange={(value) => {
-        if (value) {
-          setActiveCircuit(value as CircuitName);
-        }
+        if (value) setActiveCircuit(value as CircuitName);
       }}
       className="flex flex-wrap gap-2"
       aria-label="Circuit selector"
@@ -52,11 +48,26 @@ export function CircuitSelector({ circuits }: CircuitSelectorProps) {
         <ToggleGroup.Item
           key={circuit}
           value={circuit}
-          className="rounded-xl border border-border bg-card px-3 py-2 font-mono text-sm text-card-foreground transition data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+          className="rounded-full px-3 py-1.5 text-sm font-medium transition"
+          style={{
+            borderRadius: "var(--radius-full)",
+          }}
         >
           {circuit}
         </ToggleGroup.Item>
       ))}
+      <style>{`
+        [data-radix-toggle-group-item][data-state="on"] {
+          background: var(--primary) !important;
+          color: var(--primary-foreground) !important;
+          border: none !important;
+        }
+        [data-radix-toggle-group-item][data-state="off"] {
+          background: transparent !important;
+          color: var(--muted-foreground) !important;
+          border: 1px solid var(--border-medium) !important;
+        }
+      `}</style>
     </ToggleGroup.Root>
   );
 }

@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "simulation": {
+    "persona": "Sample portfolio reviewer",
+    "content": "Demo landing screen"
+  },
+  "overlays": [
+    {
+      "screen_index": 0,
+      "hesitation_points": [
+        {
+          "x_ratio": 0.52,
+          "y_ratio": 0.44,
+          "duration_ms": 900,
+          "intensity": 0.7
+        }
+      ],
+      "scroll_path": null
+    }
+  ],
+  "activations": [
+    {
+      "screen_index": 0,
+      "path": "demo/activations/screen_1.bin",
+      "shape": [4, 20484],
+      "timesteps": 4
+    }
+  ],
+  "roi": [
+    {
+      "screen_index": 0,
+      "circuits": {
+        "Attention": { "score": 82.4, "peak": 90.1 },
+        "Cognitive Load": { "score": 41.2, "peak": 55.4 },
+        "Emotional Response": { "score": 33.6, "peak": 45.7 },
+        "Memory Encoding": { "score": 58.3, "peak": 65.2 },
+        "Reward": { "score": 47.9, "peak": 60.3 }
+      },
+      "regions": [
+        { "atlas_label": "S_front_inf", "circuit": "Attention", "score": 82.4, "peak": 90.1 },
+        { "atlas_label": "G_rectus", "circuit": "Reward", "score": 47.9, "peak": 60.3 },
+        { "atlas_label": "G_oc-temp_med-Parahip", "circuit": "Memory Encoding", "score": 58.3, "peak": 65.2 }
+      ]
+    }
+  ],
+  "flow_continuity": {
+    "circuits": {
+      "Attention": {
+        "per_screen": [{ "screen_index": 0, "score_0_100": 82.4, "delta_from_prev": 0 }],
+        "trend": "flat"
+      },
+      "Cognitive Load": {
+        "per_screen": [{ "screen_index": 0, "score_0_100": 41.2, "delta_from_prev": 0 }],
+        "trend": "flat"
+      },
+      "Emotional Response": {
+        "per_screen": [{ "screen_index": 0, "score_0_100": 33.6, "delta_from_prev": 0 }],
+        "trend": "flat"
+      },
+      "Memory Encoding": {
+        "per_screen": [{ "screen_index": 0, "score_0_100": 58.3, "delta_from_prev": 0 }],
+        "trend": "flat"
+      },
+      "Reward": {
+        "per_screen": [{ "screen_index": 0, "score_0_100": 47.9, "delta_from_prev": 0 }],
+        "trend": "flat"
+      }
+    }
+  },
+  "recommendations": [
+    {
+      "rec_type": "copy_rewrite",
+      "screen_index": 0,
+      "evidence": {
+        "circuit": "Attention",
+        "region": "S_front_inf",
+        "activation_score": 74.3,
+        "score_rank": "High"
+      },
+      "before": "Buy now",
+      "after": "Start your free trial",
+      "rationale": "The CTA needs a more concrete reward."
+    },
+    {
+      "rec_type": "layout_flag",
+      "screen_index": 0,
+      "evidence": {
+        "circuit": "Memory Encoding",
+        "region": "G_oc-temp_med-Parahip",
+        "activation_score": 63.1,
+        "score_rank": "Moderate"
+      },
+      "element_description": "Hero CTA block",
+      "rationale": "The CTA competes with the hero art."
+    }
+  ],
+  "pathway": {
+    "selected_pathway": "text",
+    "slideshow_path": null,
+    "durations": []
+  }
+}
+

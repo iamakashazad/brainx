@@ -4,11 +4,15 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter } from "react-router-dom";
 import { App } from "./App";
 import { queryClient } from "./lib/queryClient";
+import { useThemeStore } from "./stores/themeStore";
 import "./styles/index.css";
 
-document.documentElement.classList.add("dark");
-
 async function prepareApp() {
+  document.documentElement.classList.toggle(
+    "dark",
+    useThemeStore.getState().theme === "dark",
+  );
+
   if (import.meta.env.DEV && import.meta.env.VITE_USE_MSW === "1") {
     const { worker } = await import("../tests/msw/browser");
     await worker.start({ onUnhandledRequest: "bypass" });

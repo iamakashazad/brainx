@@ -32,6 +32,7 @@ function buildJobResponse(overrides: Partial<JobStatusResponse> = {}): JobStatus
   return {
     job_id: "job-1",
     status: "PENDING",
+    persona_id: "p-1",
     queue_position: 1,
     stage: null,
     result: null,
@@ -122,6 +123,43 @@ describe("ProgressView", () => {
           name: "Simulating how your persona experiences this content…",
         }),
       ).toBeInTheDocument();
+    });
+  });
+
+  it("shows feedback when a running analysis is taking longer than usual", async () => {
+    const Wrapper = createWrapper();
+    setJobResponse(
+      "job-1",
+      buildJobResponse({
+        status: "RUNNING",
+        stage: "inference",
+        created_at: new Date(Date.now() - 130_000).toISOString(),
+      }),
+    );
+
+    render(<ProgressView />, { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText(/taking longer than usual/i)).toBeInTheDocument();
+    });
+    expect(screen.getByText(/02:10 elapsed/i)).toBeInTheDocument();
+  });
+
+  it("escalates the feedback when a running analysis looks stalled", async () => {
+    const Wrapper = createWrapper();
+    setJobResponse(
+      "job-1",
+      buildJobResponse({
+        status: "RUNNING",
+        stage: "inference",
+        created_at: new Date(Date.now() - 610_000).toISOString(),
+      }),
+    );
+
+    render(<ProgressView />, { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText(/running longer than expected/i)).toBeInTheDocument();
     });
   });
 

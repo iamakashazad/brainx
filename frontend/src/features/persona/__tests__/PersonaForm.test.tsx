@@ -83,27 +83,28 @@ describe("personaCreateSchema", () => {
 });
 
 describe("PersonaForm", () => {
-  it("renders the four exact tab labels", () => {
+  it("renders the Demographics step by default with expected fields", () => {
     renderPersonaForm();
 
-    expect(screen.getByRole("tab", { name: "Demographics" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Psychographics" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Cognitive State" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Environment" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Persona Name")).toBeInTheDocument();
+    expect(screen.getByLabelText("Age")).toBeInTheDocument();
+    expect(screen.getByLabelText("Role")).toBeInTheDocument();
+    expect(screen.getByLabelText("Background")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Next/i })).toBeInTheDocument();
   });
 
-  it("advances persona tab progress after valid demographics input", async () => {
+  it("advances to Psychographics step after valid demographics input", async () => {
     const user = userEvent.setup();
     renderPersonaForm();
 
     await user.type(screen.getByLabelText("Persona Name"), "Focused Designer");
     await user.type(screen.getByLabelText("Age"), "29");
     await user.type(screen.getByLabelText("Role"), "Product Designer");
-    await user.type(screen.getByLabelText("Background"), "Builds interface reviews.");
-    await user.tab();
+
+    await user.click(screen.getByRole("button", { name: /Next/i }));
 
     await waitFor(() => {
-      expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "1");
+      expect(screen.getByLabelText("Goals")).toBeInTheDocument();
     });
   });
 
@@ -111,22 +112,29 @@ describe("PersonaForm", () => {
     const user = userEvent.setup();
     const { onCreated } = renderPersonaForm();
 
+    // Step 0: Demographics
     await user.type(screen.getByLabelText("Persona Name"), "Focused Designer");
     await user.type(screen.getByLabelText("Age"), "29");
     await user.type(screen.getByLabelText("Role"), "Product Designer");
     await user.type(screen.getByLabelText("Background"), "Builds interface reviews.");
+    await user.click(screen.getByRole("button", { name: /Next/i }));
 
-    await user.click(screen.getByRole("tab", { name: "Psychographics" }));
+    // Step 1: Psychographics
+    await waitFor(() => expect(screen.getByLabelText("Goals")).toBeInTheDocument());
     await user.type(screen.getByLabelText("Goals"), "ship faster");
     await user.type(screen.getByLabelText("Values"), "clarity");
     await user.type(screen.getByLabelText("Motivations"), "reduce friction");
+    await user.click(screen.getByRole("button", { name: /Next/i }));
 
-    await user.click(screen.getByRole("tab", { name: "Cognitive State" }));
+    // Step 2: Cognitive State
+    await waitFor(() => expect(screen.getByLabelText("Attention Span")).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText("Attention Span"), "medium");
     await user.selectOptions(screen.getByLabelText("Stress Level"), "moderate");
     await user.selectOptions(screen.getByLabelText("Tech Literacy"), "expert");
+    await user.click(screen.getByRole("button", { name: /Next/i }));
 
-    await user.click(screen.getByRole("tab", { name: "Environment" }));
+    // Step 3: Environment
+    await waitFor(() => expect(screen.getByLabelText("Device")).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText("Device"), "desktop");
     await user.selectOptions(screen.getByLabelText("Location"), "office");
     await user.type(screen.getByLabelText("Ambient"), "quiet");

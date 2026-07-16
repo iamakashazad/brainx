@@ -1,6 +1,7 @@
 import {
   analyzeResponseSchema,
   contentCreatedSchema,
+  jobSummaryListSchema,
   jobStatusResponseSchema,
   personaCreateSchema,
   personaListSchema,
@@ -9,16 +10,25 @@ import {
 import type {
   AnalyzeResponse,
   ContentCreated,
+  JobSummary,
   JobStatusResponse,
   PersonaCreate,
   PersonaRead,
 } from "./api-types";
+import { ApiError } from "./errors";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 
 async function parseResponse<T>(response: Response, parser: { parse: (data: unknown) => T }) {
   if (!response.ok) {
-    throw new Error(`API request failed with status ${response.status}`);
+    let message = "";
+    try {
+      const body = (await response.json()) as { detail?: unknown };
+      message = typeof body.detail === "string" ? body.detail : "";
+    } catch {
+      message = "";
+    }
+    throw new ApiError(response.status, message);
   }
 
   const json = (await response.json()) as unknown;
@@ -53,7 +63,7 @@ export async function deletePersona(id: string, signal?: AbortSignal): Promise<v
   });
 
   if (!response.ok && response.status !== 204) {
-    throw new Error(`API request failed with status ${response.status}`);
+    throw new ApiError(response.status, "");
   }
 }
 
@@ -127,4 +137,46 @@ export async function getJobStatus(
     signal,
   });
   return parseResponse(response, jobStatusResponseSchema);
+}
+
+export async function deleteJob(jobId: string, signal?: AbortSignal): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/jobs/${jobId}`, {
+    method: "DELETE",
+    signal,
+  });
+
+  if (!response.ok && response.status !== 204) {
+    throw new ApiError(response.status, "");
+  }
+}
+
+export async function listJobs(signal?: AbortSignal): Promise<JobSummary[]> {
+  const response = await fetch(`${API_BASE_URL}/jobs`, { signal });
+  return parseResponse(response, jobSummaryListSchema);
+}
+
+export type AISuggestRequest = {
+  name: string;
+  age: number;
+  role: string;
+  background?: string | null;
+  field: string;
+};
+
+export type AISuggestResponse = {
+  value: string | string[];
+};
+
+export async function suggestPersonaField(
+  body: AISuggestRequest,
+  signal?: AbortSignal,
+): Promise<AISuggestResponse> {
+  const response = await fetch(`${API_BASE_URL}/personas/ai-suggest`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    signal,
+  });
+  if (!response.ok) throw new ApiError(response.status, "AI suggest failed");
+  return (await response.json()) as AISuggestResponse;
 }

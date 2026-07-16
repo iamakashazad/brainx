@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import shutil
 from pathlib import Path
 
 import numpy as np
@@ -9,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.core import database
+from backend.core.config import settings
 from backend.models.content import Content, ContentType
 from backend.models.recommendations import Recommendations
 from backend.models.results import AnalysisResult, SCHEMA_VERSION
@@ -21,6 +23,7 @@ from backend.services.recommendations import generate_recommendations
 from backend.services.inference import run_tribev2_text, run_tribev2_video
 from backend.services.overlay import derive_overlays
 from backend.services.pathway_config import resolve_runtime_pathway
+from backend.services.process_guard import cleanup_workspace_whisperx_processes
 from backend.services.roi_aggregation import (
     aggregate_screen_roi,
     get_surf_atlas,
@@ -36,10 +39,73 @@ from backend.services.video_slideshow import (
 logger = logging.getLogger(__name__)
 
 gpu_queue: asyncio.Queue[str] = asyncio.Queue()
+queue_capacity_lock = asyncio.Lock()
+cancel_requested: set[str] = set()
 
 
 def _pending_job_ids() -> list[str]:
     return list(gpu_queue._queue)  # noqa: SLF001 - queue order is required for position tracking
+
+
+def _remove_pending_job(job_id: str) -> bool:
+    pending = _pending_job_ids()
+    if job_id not in pending:
+        return False
+
+    gpu_queue._queue.clear()  # noqa: SLF001 - queue order mutation is required for cancellation
+    for pending_job_id in pending:
+        if pending_job_id != job_id:
+            gpu_queue._queue.append(pending_job_id)  # noqa: SLF001
+    return True
+
+
+def _job_artifact_dir(job_id: str) -> Path:
+    return Path("activations") / job_id
+
+
+def _delete_job_artifacts(job_id: str) -> None:
+    artifact_dir = _job_artifact_dir(job_id)
+    if artifact_dir.exists():
+        shutil.rmtree(artifact_dir, ignore_errors=True)
+
+
+async def cancel_and_delete_job(job_id: str) -> bool:
+    """Best-effort one-way cancellation.
+
+    Pending jobs are removed from the in-memory queue immediately. Running jobs
+    cannot safely kill a Python executor thread, but killing workspace WhisperX
+    subprocesses interrupts the expensive child-process portion and deleting the
+    DB row makes the worker abandon any later writes.
+    """
+    cancel_requested.add(job_id)
+
+    async with queue_capacity_lock:
+        _remove_pending_job(job_id)
+
+        async with database.async_session() as session:
+            job = (await session.execute(select(Job).where(Job.id == job_id))).scalar_one_or_none()
+            if job is None:
+                await sync_pending_queue_positions()
+                return False
+            should_cleanup_processes = job.status == "RUNNING"
+            await session.delete(job)
+            await session.commit()
+
+        if should_cleanup_processes:
+            cleanup_workspace_whisperx_processes()
+        _delete_job_artifacts(job_id)
+        await sync_pending_queue_positions()
+        return True
+
+
+def _is_cancelled(job_id: str) -> bool:
+    return job_id in cancel_requested
+
+
+async def _job_exists(job_id: str) -> bool:
+    async with database.async_session() as session:
+        job = (await session.execute(select(Job).where(Job.id == job_id))).scalar_one_or_none()
+        return job is not None
 
 
 async def sync_pending_queue_positions() -> None:
@@ -58,6 +124,27 @@ async def sync_pending_queue_positions() -> None:
                 job.queue_position = index
 
         await session.commit()
+
+
+async def mark_interrupted_jobs() -> int:
+    """Fail jobs that cannot resume because the in-memory worker queue restarted."""
+    async with database.async_session() as session:
+        result = await session.execute(
+            select(Job).where(Job.status.in_(["PENDING", "RUNNING"]))
+        )
+        jobs = result.scalars().all()
+
+        for job in jobs:
+            job.status = "ERROR"
+            job.stage = None
+            job.queue_position = None
+            job.error_message = (
+                "Analysis was interrupted before it finished. "
+                "Please start a new analysis."
+            )
+
+        await session.commit()
+        return len(jobs)
 
 
 async def transition(session: AsyncSession, job: Job, stage: StageEnum | None) -> None:
@@ -113,12 +200,38 @@ async def gpu_worker_loop() -> None:
     while True:
         job_id = await gpu_queue.get()
         try:
-            await _process_job(job_id)
+            if not _is_cancelled(job_id):
+                await asyncio.wait_for(
+                    _process_job(job_id),
+                    timeout=settings.job_timeout_seconds,
+                )
+        except TimeoutError:
+            logger.error("job %s timed out after %s seconds", job_id, settings.job_timeout_seconds)
+            await _mark_timed_out(job_id, settings.job_timeout_seconds)
         finally:
+            cancel_requested.discard(job_id)
             gpu_queue.task_done()
 
 
+async def _mark_timed_out(job_id: str, timeout_seconds: int) -> None:
+    async with database.async_session() as session:
+        job = (await session.execute(select(Job).where(Job.id == job_id))).scalar_one_or_none()
+        if job is None:
+            return
+        job.status = "ERROR"
+        job.stage = None
+        job.queue_position = None
+        job.error_message = (
+            f"Analysis timed out after {timeout_seconds} seconds. "
+            "Please try again with shorter content."
+        )
+        await session.commit()
+
+
 async def _process_job(job_id: str) -> None:
+    if _is_cancelled(job_id):
+        return
+
     async with database.async_session() as session:
         result = await session.execute(select(Job).where(Job.id == job_id))
         job = result.scalar_one_or_none()
@@ -166,20 +279,27 @@ async def _process_job(job_id: str) -> None:
         return
 
     try:
+        if _is_cancelled(job_id):
+            return
         async with database.async_session() as session:
             job = (await session.execute(select(Job).where(Job.id == job_id))).scalar_one()
             await transition(session, job, StageEnum.SIMULATION)
         sim_log = await simulation.simulate(persona, content)
+        if _is_cancelled(job_id) or not await _job_exists(job_id):
+            return
 
         async with database.async_session() as session:
             job = (await session.execute(select(Job).where(Job.id == job_id))).scalar_one()
             await transition(session, job, StageEnum.GROUNDING_CHECK)
         await grounding.judge(content, sim_log)
+        if _is_cancelled(job_id) or not await _job_exists(job_id):
+            return
 
         selected_pathway = resolve_runtime_pathway(content)
         async with database.async_session() as session:
             job = (await session.execute(select(Job).where(Job.id == job_id))).scalar_one()
             await transition(session, job, StageEnum.INFERENCE)
+        cleanup_workspace_whisperx_processes()
 
         for screen in sim_log.screens:
             _validate_screen_narrative(screen.screen_index, screen.narrative_text)
@@ -218,6 +338,8 @@ async def _process_job(job_id: str) -> None:
                 output_path=slideshow_path.as_posix(),
             )
             video_activation = await _run_video_inference_with_retry(slideshow_artifact)
+            if _is_cancelled(job_id) or not await _job_exists(job_id):
+                return
             per_screen_arrays = split_video_activation_by_screen(
                 activation=video_activation,
                 durations=durations,
@@ -236,10 +358,14 @@ async def _process_job(job_id: str) -> None:
         else:
             per_screen_arrays = []
             for screen in sim_log.screens:
+                if _is_cancelled(job_id) or not await _job_exists(job_id):
+                    return
                 arr = await _run_screen_inference_with_retry(
                     screen.screen_index,
                     screen.narrative_text,
                 )
+                if _is_cancelled(job_id) or not await _job_exists(job_id):
+                    return
                 per_screen_arrays.append(arr)
             activations_manifest = _save_per_screen_activations(
                 job_act_dir=job_act_dir,

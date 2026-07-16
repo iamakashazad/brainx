@@ -35,6 +35,7 @@ function buildJobResponse(overrides: Partial<JobStatusResponse> = {}): JobStatus
   return {
     job_id: "job-1",
     status: "PENDING",
+    persona_id: "p-1",
     queue_position: 2,
     stage: null,
     result: null,

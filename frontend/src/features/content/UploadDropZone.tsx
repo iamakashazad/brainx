@@ -19,15 +19,12 @@ function filterFiles(files: File[], accept?: string) {
       rejected.push(`${file.name} is larger than 10 MB.`);
       return false;
     }
-
     if (accept === "image/*" && !file.type.startsWith("image/")) {
       rejected.push(`${file.name} is not a supported image file.`);
       return false;
     }
-
     return true;
   });
-
   return { accepted, rejected };
 }
 
@@ -46,13 +43,11 @@ export function UploadDropZone({
   const handleIncomingFiles = (incomingFiles: File[]) => {
     const { accepted, rejected } = filterFiles(incomingFiles, accept);
     log("upload", "selected files", { files: incomingFiles });
-
     if (rejected.length > 0) {
       setError(rejected[0] ?? null);
     } else {
       setError(null);
     }
-
     if (accepted.length > 0) {
       onFiles(accepted);
     }
@@ -80,11 +75,14 @@ export function UploadDropZone({
       <button
         type="button"
         disabled={disabled}
-        className={[
-          "flex w-full flex-col items-center justify-center gap-3 rounded-2xl border border-dashed bg-muted px-6 py-10 text-center transition",
-          isDragging ? "border-primary outline-2 outline-primary" : "border-border",
-          disabled ? "cursor-not-allowed opacity-60" : "hover:bg-accent",
-        ].join(" ")}
+        className="flex w-full flex-col items-center justify-center gap-3 px-6 py-12 text-center transition"
+        style={{
+          border: `2px dashed ${isDragging ? "var(--color-brand)" : "var(--border-medium)"}`,
+          borderRadius: "var(--radius)",
+          background: isDragging ? "var(--color-brand-light)" : "var(--card)",
+          cursor: disabled ? "not-allowed" : "pointer",
+          opacity: disabled ? 0.6 : 1,
+        }}
         onClick={() => inputRef.current?.click()}
         onDragOver={(event) => {
           event.preventDefault();
@@ -97,11 +95,21 @@ export function UploadDropZone({
           handleIncomingFiles(Array.from(event.dataTransfer.files));
         }}
       >
-        <Upload className="h-6 w-6 text-primary" />
-        <span className="text-sm font-semibold text-foreground">{label}</span>
+        <Upload
+          className="h-6 w-6"
+          style={{ color: isDragging ? "var(--color-brand-deep)" : "var(--muted-foreground)" }}
+        />
+        <span
+          className="text-sm font-medium"
+          style={{ color: isDragging ? "var(--color-brand-deep)" : "var(--muted-foreground)" }}
+        >
+          {label}
+        </span>
       </button>
-      <div aria-live="polite" className="min-h-5 text-sm text-muted-foreground">
-        {error ? <span className="text-destructive">{error}</span> : null}
+      <div aria-live="polite" className="min-h-5 text-sm">
+        {error ? (
+          <span style={{ color: "var(--color-error)" }}>{error}</span>
+        ) : null}
       </div>
     </div>
   );

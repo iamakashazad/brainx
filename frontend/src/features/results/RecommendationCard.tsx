@@ -3,27 +3,19 @@ import { useWizardStore } from "@/stores/wizardStore";
 import { cycleToSecondary, groupRecsByScreen, type RecWithId } from "./recommendationsByScreen";
 
 function formatRecType(recType: RecWithId["rec_type"]) {
-  if (recType === "emotional_dropoff") {
-    return "Emotional Drop-off";
-  }
+  if (recType === "emotional_dropoff") return "Emotional Drop-off";
   return recType
     .split("_")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
 }
 
-function rankClass(rank: RecWithId["evidence"]["score_rank"]) {
-  switch (rank) {
-    case "Very High":
-      return "bg-primary/15 text-primary";
-    case "High":
-      return "bg-[color:var(--chart-2)]/15 text-[color:var(--chart-2)]";
-    case "Moderate":
-      return "bg-[color:var(--chart-5)]/15 text-[color:var(--chart-5)]";
-    default:
-      return "bg-muted text-muted-foreground";
-  }
-}
+const RANK_STYLE: Record<RecWithId["evidence"]["score_rank"], React.CSSProperties> = {
+  "Very High": { background: "var(--color-brand-light)", color: "var(--color-brand-deep)" },
+  "High":      { background: "var(--color-blue-bg)",    color: "var(--color-blue)" },
+  "Moderate":  { background: "var(--color-amber-bg)",   color: "var(--color-amber)" },
+  "Low":       { background: "var(--muted)",            color: "var(--muted-foreground)" },
+};
 
 export function RecommendationCard({
   rec,
@@ -32,12 +24,12 @@ export function RecommendationCard({
   rec: RecWithId;
   allRecs: RecWithId[];
 }) {
-  const activeRecId = useWizardStore((state) => state.activeRecId);
-  const secondaryRecLocationCursor = useWizardStore((state) => state.secondaryRecLocationCursor);
-  const setActiveRecId = useWizardStore((state) => state.setActiveRecId);
-  const setActiveScreenIndex = useWizardStore((state) => state.setActiveScreenIndex);
-  const setActiveCircuit = useWizardStore((state) => state.setActiveCircuit);
-  const bumpSecondaryCursor = useWizardStore((state) => state.bumpSecondaryCursor);
+  const activeRecId = useWizardStore((s) => s.activeRecId);
+  const secondaryRecLocationCursor = useWizardStore((s) => s.secondaryRecLocationCursor);
+  const setActiveRecId = useWizardStore((s) => s.setActiveRecId);
+  const setActiveScreenIndex = useWizardStore((s) => s.setActiveScreenIndex);
+  const setActiveCircuit = useWizardStore((s) => s.setActiveCircuit);
+  const bumpSecondaryCursor = useWizardStore((s) => s.bumpSecondaryCursor);
   const isActive = activeRecId === rec.id;
 
   const handleClick = () => {
@@ -50,7 +42,6 @@ export function RecommendationCard({
       setActiveCircuit(next.evidence.circuit);
       return;
     }
-
     setActiveRecId(rec.id);
     setActiveScreenIndex(rec.screen_index);
     setActiveCircuit(rec.evidence.circuit);
@@ -59,55 +50,113 @@ export function RecommendationCard({
   return (
     <motion.button
       type="button"
-      whileHover={{ scale: 1.01, y: -2 }}
+      whileHover={{ y: -1 }}
       transition={{ duration: 0.15, ease: "easeOut" }}
       onClick={handleClick}
-      className={[
-        "w-full rounded-2xl border border-border bg-card p-4 text-left shadow-lg transition",
-        isActive ? "border-l-4 border-primary" : "hover:border-primary/40",
-      ].join(" ")}
+      className="w-full text-left transition"
+      style={{
+        background: "var(--card)",
+        border: isActive
+          ? "1px solid var(--color-brand)"
+          : "1px solid var(--border)",
+        borderLeft: isActive
+          ? "3px solid var(--color-brand)"
+          : "1px solid var(--border)",
+        borderRadius: "var(--radius)",
+        padding: "16px",
+        boxShadow: "var(--shadow)",
+      }}
     >
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="rounded-full border border-border px-2 py-1 text-xs font-semibold text-foreground">
+      {/* Badges */}
+      <div className="flex flex-wrap items-center gap-2 mb-3">
+        <span
+          className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider"
+          style={{
+            background: "var(--muted)",
+            color: "var(--muted-foreground)",
+            fontFamily: "var(--font-mono)",
+            letterSpacing: "0.6px",
+            borderRadius: "var(--radius-full)",
+          }}
+        >
           {formatRecType(rec.rec_type)}
         </span>
-        <span className={`rounded-full px-2 py-1 text-xs font-semibold ${rankClass(rec.evidence.score_rank)}`}>
+        <span
+          className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold"
+          style={{
+            ...RANK_STYLE[rec.evidence.score_rank],
+            borderRadius: "var(--radius-full)",
+          }}
+        >
           {rec.evidence.score_rank}
+        </span>
+        <span
+          className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
+          style={{
+            background: "var(--muted)",
+            color: "var(--muted-foreground)",
+            borderRadius: "var(--radius-full)",
+          }}
+        >
+          {`Screen ${rec.screen_index + 1}`}
         </span>
       </div>
 
-      <div className="mt-4 space-y-3">
-        {rec.rec_type === "copy_rewrite" ? (
+      {/* Body */}
+      <div className="space-y-2">
+        {rec.rec_type === "copy_rewrite" && (
           <>
-            {rec.before ? (
-              <p className="line-through text-sm text-muted-foreground">{rec.before}</p>
-            ) : null}
-            {rec.after ? (
-              <p className="text-base font-semibold text-foreground">{rec.after}</p>
-            ) : null}
-            <p className="text-sm leading-6 text-muted-foreground">{rec.rationale}</p>
+            {rec.before && (
+              <p
+                className="text-sm line-through"
+                style={{ color: "var(--muted-foreground)" }}
+              >
+                {rec.before}
+              </p>
+            )}
+            {rec.after && (
+              <p
+                className="text-sm font-semibold"
+                style={{ color: "var(--foreground)", letterSpacing: "-0.1px" }}
+              >
+                {rec.after}
+              </p>
+            )}
+            <p className="text-sm" style={{ color: "var(--muted-foreground)", lineHeight: "1.6" }}>
+              {rec.rationale}
+            </p>
           </>
-        ) : null}
+        )}
 
-        {rec.rec_type === "layout_flag" ? (
+        {rec.rec_type === "layout_flag" && (
           <>
-            <p className="text-base font-semibold text-foreground">
+            <p
+              className="text-sm font-semibold"
+              style={{ color: "var(--foreground)" }}
+            >
               {rec.element_description ?? "Layout element"}
             </p>
-            <p className="text-sm leading-6 text-muted-foreground">{rec.rationale}</p>
+            <p className="text-sm" style={{ color: "var(--muted-foreground)", lineHeight: "1.6" }}>
+              {rec.rationale}
+            </p>
           </>
-        ) : null}
+        )}
 
-        {rec.rec_type === "memorability" || rec.rec_type === "emotional_dropoff" ? (
+        {(rec.rec_type === "memorability" || rec.rec_type === "emotional_dropoff") && (
           <>
-            <p className="text-sm font-semibold text-foreground">{`Screen ${rec.screen_index + 1}`}</p>
-            <p className="text-sm leading-6 text-muted-foreground">{rec.rationale}</p>
+            <p className="text-sm" style={{ color: "var(--muted-foreground)", lineHeight: "1.6" }}>
+              {rec.rationale}
+            </p>
           </>
-        ) : null}
+        )}
       </div>
 
-      <p className="mt-4 font-mono text-sm text-muted-foreground">
-        {`${rec.evidence.circuit} · ${rec.evidence.region} · ${rec.evidence.activation_score.toFixed(1)}/100 · ${rec.evidence.score_rank}`}
+      {/* Evidence pills */}
+      <p
+        className="mt-3 text-xs"
+        style={{ color: "var(--muted-foreground)", fontFamily: "var(--font-mono)" }}
+      >
+        {`${rec.evidence.circuit} · ${rec.evidence.region} · ${rec.evidence.activation_score.toFixed(1)}/100`}
       </p>
     </motion.button>
   );

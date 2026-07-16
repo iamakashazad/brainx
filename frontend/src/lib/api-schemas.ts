@@ -131,10 +131,10 @@ export const recommendationSchema = z.object({
       width_ratio: z.number(),
       height_ratio: z.number(),
     })
-    .optional(),
-  element_description: z.string().optional(),
-  before: z.string().optional(),
-  after: z.string().optional(),
+    .nullish(),
+  element_description: z.string().nullish(),
+  before: z.string().nullish(),
+  after: z.string().nullish(),
   rationale: z.string(),
 });
 
@@ -178,9 +178,24 @@ export const analysisResultSchema = z.object({
 export const jobStatusResponseSchema = z.object({
   job_id: z.string(),
   status: jobStatusSchema,
+  persona_id: z.string().nullable(),
   queue_position: z.number().int().nullable(),
   stage: stageValueSchema.nullable(),
   result: analysisResultSchema.nullable(),
   error: z.string().nullable(),
   created_at: z.string().nullable(),
+  updated_at: z.string().nullable().optional().default(null),
+  runtime_seconds: z.number().int().nullable().optional().default(null),
+  inference_processes: z.number().int().optional().default(0),
+  stale_inference_processes: z.number().int().optional().default(0),
+  status_message: z.string().nullable().optional().default(null),
 });
+
+export const jobSummarySchema = z.object({
+  job_id: z.string(),
+  status: jobStatusSchema,
+  persona_id: z.string().nullable(),
+  created_at: z.string().nullable(),
+});
+
+export const jobSummaryListSchema = z.array(jobSummarySchema);

@@ -1,5 +1,5 @@
 import { http, HttpResponse } from "msw";
-import type { AnalysisResult, JobStatusResponse } from "@/lib/api-types";
+import type { AnalysisResult, JobStatusResponse, JobSummary } from "@/lib/api-types";
 
 const now = "2026-04-24T12:00:00.000Z";
 
@@ -18,6 +18,7 @@ type MockJobResponse = {
   result: unknown;
   error: string | null;
   created_at: string | null;
+  persona_id: string | null;
 };
 
 function createDefaultJobResponse(jobId: string): MockJobResponse {
@@ -29,10 +30,11 @@ function createDefaultJobResponse(jobId: string): MockJobResponse {
     result: null,
     error: null,
     created_at: now,
+    persona_id: null,
   };
 }
 
-function buildFixtureResult(): AnalysisResult {
+export function buildFixtureResult(): AnalysisResult {
   return {
     schema_version: 1,
     simulation: {},
@@ -128,9 +130,27 @@ function buildFixtureResult(): AnalysisResult {
 
 const jobResponses = new Map<string, MockJobResponse>();
 
+const defaultJobsList: JobSummary[] = [
+  { job_id: "job-1", status: "DONE", persona_id: "p-1", created_at: "2026-04-24T12:00:00.000Z" },
+  { job_id: "job-2", status: "DONE", persona_id: "p-2", created_at: "2026-04-23T10:00:00.000Z" },
+];
+
+const jobsList: JobSummary[] = [...defaultJobsList];
+
+export function setJobsList(next: JobSummary[]) {
+  jobsList.length = 0;
+  jobsList.push(...next);
+}
+
+export function resetJobsList() {
+  setJobsList(defaultJobsList);
+}
+
 export function resetJobResponses() {
   jobResponses.clear();
-  jobResponses.set("job-1", createDefaultJobResponse("job-1"));
+  // Seed list jobs as DONE so detail view matches list status
+  setFixtureDoneJob("job-1", "p-1");
+  setFixtureDoneJob("job-2", "p-2");
 }
 
 export function setJobResponse(
@@ -145,13 +165,14 @@ export function setJobResponse(
   });
 }
 
-export function setFixtureDoneJob(jobId: string) {
+export function setFixtureDoneJob(jobId: string, personaId = "p-1") {
   setJobResponse(jobId, {
     status: "DONE",
     queue_position: null,
     stage: "recommendations",
     result: buildFixtureResult(),
     error: null,
+    persona_id: personaId,
   } satisfies Partial<JobStatusResponse>);
 }
 
@@ -214,6 +235,11 @@ const seededPersonas = [
 
 export const handlers = [
   http.get("http://localhost:8000/personas", () => HttpResponse.json(seededPersonas)),
+  http.post("http://localhost:8000/personas/ai-suggest", async ({ request }) => {
+    const body = (await request.json()) as { field: string };
+    const isListField = ["psychographics.goals", "psychographics.values", "psychographics.motivations"].includes(body.field);
+    return HttpResponse.json({ value: isListField ? ["ai-suggestion"] : "ai-suggestion" });
+  }),
   http.post("http://localhost:8000/personas", async ({ request }) => {
     const body = (await request.json()) as Record<string, unknown>;
     return HttpResponse.json(
@@ -240,6 +266,7 @@ export const handlers = [
     setFixtureDoneJob("job-1");
     return HttpResponse.json({ job_id: "job-1", status: "PENDING" }, { status: 201 });
   }),
+  http.get("http://localhost:8000/jobs", () => HttpResponse.json(jobsList)),
   http.get("http://localhost:8000/jobs/:id", ({ params }) => {
     const jobId = String(params.id);
     const response = jobResponses.get(jobId) ?? createDefaultJobResponse(jobId);

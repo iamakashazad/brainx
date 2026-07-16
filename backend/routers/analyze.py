@@ -12,6 +12,7 @@ from backend.models.persona import Persona
 from backend.models.schemas import AnalyzeRequest, AnalyzeResponse
 
 router = APIRouter()
+QUEUE_DEPTH_LIMIT = 3
 
 
 @router.post("", response_model=AnalyzeResponse, status_code=status.HTTP_201_CREATED)
@@ -29,16 +30,23 @@ async def submit_analyze(payload: AnalyzeRequest) -> AnalyzeResponse:
         if content is None:
             raise HTTPException(status_code=404, detail=f"Content {payload.content_id} not found")
 
-        job = Job(
-            id=str(uuid.uuid4()),
-            status="PENDING",
-            queue_position=queue_manager.gpu_queue.qsize() + 1,
-            persona_id=payload.persona_id,
-            content_id=payload.content_id,
-        )
-        session.add(job)
-        await session.commit()
+        async with queue_manager.queue_capacity_lock:
+            if queue_manager.gpu_queue.qsize() >= QUEUE_DEPTH_LIMIT:
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="The analysis queue is full. Please try again in a moment.",
+                )
 
-    await queue_manager.gpu_queue.put(job.id)
+            job = Job(
+                id=str(uuid.uuid4()),
+                status="PENDING",
+                queue_position=queue_manager.gpu_queue.qsize() + 1,
+                persona_id=payload.persona_id,
+                content_id=payload.content_id,
+            )
+            session.add(job)
+            await session.commit()
+            await queue_manager.gpu_queue.put(job.id)
+
     await queue_manager.sync_pending_queue_positions()
     return AnalyzeResponse(job_id=job.id, status="PENDING")

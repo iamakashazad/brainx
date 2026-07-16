@@ -11,12 +11,7 @@ export default defineConfig({
     },
   },
   server: {
+    host: "0.0.0.0",
     port: 5173,
-    proxy: {
-      "/personas": "http://localhost:8000",
-      "/content": "http://localhost:8000",
-      "/analyze": "http://localhost:8000",
-      "/jobs": "http://localhost:8000",
-    },
   },
 });

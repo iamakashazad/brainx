@@ -1,11 +1,28 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>BrainX</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Geist+Mono:wght@500;600&display=swap"
+      rel="stylesheet"
+    />
   </head>
   <body>
+    <script>
+      (function () {
+        try {
+          var stored = JSON.parse(localStorage.getItem("brainx-theme") || "{}");
+          var theme = stored && stored.state && stored.state.theme ? stored.state.theme : "dark";
+          if (theme === "dark") document.documentElement.classList.add("dark");
+        } catch (_error) {
+          document.documentElement.classList.add("dark");
+        }
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

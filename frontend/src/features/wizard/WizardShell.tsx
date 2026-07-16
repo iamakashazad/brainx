@@ -5,7 +5,7 @@ import { ProgressView } from "@/features/run/ProgressView";
 import { useWizardStore } from "@/stores/wizardStore";
 import { WizardStep } from "./WizardStep";
 import { WizardStepper } from "./WizardStepper";
-import { useSubmitAnalyze } from "./useSubmitAnalyze";
+import { isQueueBusyError, useSubmitAnalyze } from "./useSubmitAnalyze";
 
 function getStepContent(step: 1 | 2 | 3 | 4) {
   switch (step) {
@@ -29,6 +29,7 @@ export function WizardShell() {
   const jobId = useWizardStore((state) => state.jobId);
   const setStep = useWizardStore((state) => state.setStep);
   const submitAnalyzeMutation = useSubmitAnalyze();
+  const queueBusy = isQueueBusyError(submitAnalyzeMutation.error);
 
   if (currentStep === 3) {
     return <ProgressView />;
@@ -88,6 +89,11 @@ export function WizardShell() {
             >
               Analyze Content
             </button>
+            {queueBusy ? (
+              <p className="text-sm font-semibold text-destructive" role="alert">
+                The analysis queue is full. Please try again in a moment.
+              </p>
+            ) : null}
           </div>
         ) : null}
         {currentStep === 4 ? (

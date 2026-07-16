@@ -26,10 +26,23 @@ class TestInferenceResponse(BaseModel):
 class JobStatusResponse(BaseModel):
     job_id: str
     status: str
+    persona_id: Optional[str] = None
     queue_position: Optional[int] = None
     stage: Optional[str] = None
     result: Optional[dict[str, Any]] = None
     error: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+    runtime_seconds: Optional[int] = None
+    inference_processes: int = 0
+    stale_inference_processes: int = 0
+    status_message: Optional[str] = None
+
+
+class JobSummary(BaseModel):
+    job_id: str
+    status: str
+    persona_id: Optional[str] = None
     created_at: Optional[str] = None
 
 

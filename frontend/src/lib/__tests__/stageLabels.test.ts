@@ -8,6 +8,8 @@ import {
   DISPLAY_INFERRING,
   DISPLAY_QUEUED,
   DISPLAY_SIMULATING,
+  DISPLAY_TIMEOUT_BODY,
+  displayFailureBodyFor,
   displayStage,
   displayStatusForStage,
   stageOrder,
@@ -71,5 +73,14 @@ describe("stageLabels", () => {
 
     // @ts-expect-error backend stages stay snake_case, never UI copy aliases
     displayStage("simulating", "RUNNING");
+  });
+
+  it("returns timeout failure copy for timed-out jobs", () => {
+    expect(displayFailureBodyFor("Job timed out after 600 seconds")).toBe(DISPLAY_TIMEOUT_BODY);
+  });
+
+  it("returns default failure copy for non-timeout errors", () => {
+    expect(displayFailureBodyFor(null)).toBe(DISPLAY_FAILED_BODY);
+    expect(displayFailureBodyFor("Inference failed")).toBe(DISPLAY_FAILED_BODY);
   });
 });

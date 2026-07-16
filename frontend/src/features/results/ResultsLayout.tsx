@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { CircuitName } from "@/lib/api-types";
+import type { AnalysisResult, CircuitName } from "@/lib/api-types";
 import { useJobStatus } from "@/features/run/useJobStatus";
 import { useWizardStore } from "@/stores/wizardStore";
 import { BrainCanvas } from "./BrainCanvas";
@@ -17,15 +17,21 @@ function getHighestCircuit(circuits: Record<CircuitName, { score: number }>) {
   )[0];
 }
 
-export function ResultsLayout() {
-  const jobId = useWizardStore((state) => state.jobId);
+type ResultsLayoutProps = {
+  resultOverride?: AnalysisResult;
+  jobIdOverride?: string;
+};
+
+export function ResultsLayout({ resultOverride, jobIdOverride }: ResultsLayoutProps = {}) {
+  const storedJobId = useWizardStore((state) => state.jobId);
+  const jobId = jobIdOverride ?? storedJobId;
   const activeScreenIndex = useWizardStore((state) => state.activeScreenIndex);
   const activeCircuit = useWizardStore((state) => state.activeCircuit);
   const setActiveCircuit = useWizardStore((state) => state.setActiveCircuit);
   const setActiveScreenIndex = useWizardStore((state) => state.setActiveScreenIndex);
   const [activePreset, setActivePreset] = useState<"Lateral-L" | "Lateral-R" | "Superior" | "Anterior">("Lateral-L");
-  const jobQuery = useJobStatus(jobId);
-  const result = jobQuery.data?.result;
+  const jobQuery = useJobStatus(resultOverride ? null : jobId);
+  const result = resultOverride ?? jobQuery.data?.result;
 
   useEffect(() => {
     if (activeCircuit !== null || !result?.roi[0]) {

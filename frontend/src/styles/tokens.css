@@ -1,111 +1,180 @@
 /*
- * BrainX Phase 4 — Design System Tokens
+ * BrainX — Mintlify-Inspired Design System Tokens
  *
- * Canonical source of truth for color, typography, radius, and shadow tokens
- * used by the Phase 4 React frontend. Dark theme is the default for this app.
+ * Canonical source of truth for color, typography, radius, and shadow tokens.
+ * Inspired by Mintlify: white canvas, near-black text, brand-green accent (#18E299).
+ *
+ * Light mode is the default. Dark mode inverts the palette while preserving brand green.
  *
  * Downstream:
- *   - Tailwind config reads these via @theme inline
+ *   - Tailwind v4 reads these via @theme inline
  *   - Radix primitives are styled against these tokens
  *   - Components MUST NOT introduce new color literals — use these vars only
  *
- * To modify the UI later: edit this file; no component-level color should
- * exist outside these tokens.
+ * To modify the UI: edit this file only. No color literals in components.
  */
 
 :root {
-  --background: oklch(0.96 0.01 196.81);
-  --foreground: oklch(0.38 0.06 211.49);
-  --card: oklch(0.98 0.00 196.66);
-  --card-foreground: oklch(0.38 0.06 211.49);
-  --popover: oklch(0.97 0.01 196.81);
-  --popover-foreground: oklch(0.38 0.06 211.49);
-  --primary: oklch(0.72 0.12 210.36);
-  --primary-foreground: oklch(1.00 0 0);
-  --secondary: oklch(0.97 0.01 247.91);
-  --secondary-foreground: oklch(0.14 0 0);
-  --muted: oklch(0.94 0.01 196.81);
-  --muted-foreground: oklch(0.55 0.04 256.40);
-  --accent: oklch(0.92 0.02 204.76);
-  --accent-foreground: oklch(0.57 0.10 213.73);
-  --destructive: oklch(0.64 0.21 25.39);
-  --border: oklch(0.93 0.01 256.71);
-  --input: oklch(0.93 0.01 256.71);
-  --ring: oklch(0.72 0.12 210.36);
-  --chart-1: oklch(0.72 0.12 210.36);
-  --chart-2: oklch(0.57 0.10 213.73);
-  --chart-3: oklch(0.79 0.12 209.45);
-  --chart-4: oklch(0.76 0.11 208.70);
-  --chart-5: oklch(0.83 0.10 208.33);
-  --sidebar: oklch(0.98 0 0);
-  --sidebar-foreground: oklch(0.14 0 0);
-  --sidebar-primary: oklch(0.72 0.12 210.36);
-  --sidebar-primary-foreground: oklch(1.00 0 0);
-  --sidebar-accent: oklch(0.96 0.02 204.34);
-  --sidebar-accent-foreground: oklch(0.57 0.10 213.73);
-  --sidebar-border: oklch(0.93 0.01 256.71);
-  --sidebar-ring: oklch(0.72 0.12 210.36);
+  /* ── Core Palette ─────────────────────────────────────────────────── */
+  --color-near-black: #0d0d0d;
+  --color-pure-white: #ffffff;
+  --color-brand: #18E299;
+  --color-brand-light: #d4fae8;
+  --color-brand-deep: #0fa76e;
 
-  --font-sans: Inter, sans-serif;
-  --font-serif: Lora, serif;
-  --font-mono: Roboto Mono, monospace;
+  /* ── Neutral Scale ────────────────────────────────────────────────── */
+  --color-gray-900: #0d0d0d;
+  --color-gray-700: #333333;
+  --color-gray-500: #666666;
+  --color-gray-400: #888888;
+  --color-gray-200: #e5e5e5;
+  --color-gray-100: #f5f5f5;
+  --color-gray-50: #fafafa;
 
-  --radius: 0.5rem;
+  /* ── Status Colors ────────────────────────────────────────────────── */
+  --color-amber: #c37d0d;
+  --color-amber-bg: #fef9ee;
+  --color-blue: #3772cf;
+  --color-blue-bg: #eef4ff;
+  --color-error: #d45656;
+  --color-error-bg: #fef2f2;
+  --color-success: #18E299;
+  --color-success-bg: #d4fae8;
 
-  --shadow-2xs: 0 1px 3px 0px oklch(0.00 0 0 / 0.05);
-  --shadow-xs: 0 1px 3px 0px oklch(0.00 0 0 / 0.05);
-  --shadow-sm: 0 1px 3px 0px oklch(0.00 0 0 / 0.10), 0 1px 2px -1px oklch(0.00 0 0 / 0.10);
-  --shadow: 0 1px 3px 0px oklch(0.00 0 0 / 0.10), 0 1px 2px -1px oklch(0.00 0 0 / 0.10);
-  --shadow-md: 0 1px 3px 0px oklch(0.00 0 0 / 0.10), 0 2px 4px -1px oklch(0.00 0 0 / 0.10);
-  --shadow-lg: 0 1px 3px 0px oklch(0.00 0 0 / 0.10), 0 4px 6px -1px oklch(0.00 0 0 / 0.10);
-  --shadow-xl: 0 1px 3px 0px oklch(0.00 0 0 / 0.10), 0 8px 10px -1px oklch(0.00 0 0 / 0.10);
-  --shadow-2xl: 0 1px 3px 0px oklch(0.00 0 0 / 0.25);
+  /* ── Semantic Surface Tokens ──────────────────────────────────────── */
+  --background: var(--color-pure-white);
+  --foreground: var(--color-near-black);
+
+  --card: var(--color-pure-white);
+  --card-foreground: var(--color-near-black);
+
+  --popover: var(--color-pure-white);
+  --popover-foreground: var(--color-near-black);
+
+  /* primary = near-black (dark CTA buttons) */
+  --primary: var(--color-near-black);
+  --primary-foreground: var(--color-pure-white);
+
+  /* secondary = brand green CTA */
+  --secondary: var(--color-brand);
+  --secondary-foreground: var(--color-near-black);
+
+  --muted: var(--color-gray-100);
+  --muted-foreground: var(--color-gray-500);
+
+  --accent: var(--color-gray-50);
+  --accent-foreground: var(--color-near-black);
+
+  --destructive: var(--color-error);
+  --destructive-foreground: var(--color-pure-white);
+
+  /* Borders: 5% black opacity — the Mintlify signature */
+  --border: rgba(0, 0, 0, 0.05);
+  --border-medium: rgba(0, 0, 0, 0.08);
+
+  --input: rgba(0, 0, 0, 0.08);
+  --ring: var(--color-brand);
+
+  /* ── Sidebar Tokens ───────────────────────────────────────────────── */
+  --sidebar: var(--color-pure-white);
+  --sidebar-foreground: var(--color-near-black);
+  --sidebar-primary: var(--color-brand);
+  --sidebar-primary-foreground: var(--color-near-black);
+  --sidebar-accent: var(--color-gray-50);
+  --sidebar-accent-foreground: var(--color-near-black);
+  --sidebar-border: rgba(0, 0, 0, 0.05);
+  --sidebar-ring: var(--color-brand);
+
+  /* ── Chart Tokens (circuit color palette) ────────────────────────── */
+  --chart-1: #2563eb;   /* Attention — blue */
+  --chart-2: #7c3aed;   /* Cognitive Load — purple */
+  --chart-3: #db2777;   /* Emotional Response — pink */
+  --chart-4: #d97706;   /* Memory Encoding — amber */
+  --chart-5: #059669;   /* Reward — emerald */
+
+  /* ── Typography ───────────────────────────────────────────────────── */
+  --font-sans: "Inter", "Inter Fallback", system-ui, -apple-system, sans-serif;
+  --font-mono: "Geist Mono", "Geist Mono Fallback", ui-monospace, SFMono-Regular, monospace;
+  --font-serif: "Inter", system-ui, sans-serif;
+
+  /* ── Border Radius Scale ──────────────────────────────────────────── */
+  --radius-xs: 4px;       /* inline code, small tags */
+  --radius-sm: 8px;       /* nav buttons, small containers */
+  --radius: 16px;         /* standard cards */
+  --radius-lg: 24px;      /* featured cards, hero containers */
+  --radius-full: 9999px;  /* buttons, pills, badges */
+
+  /* Legacy radius aliases for Tailwind compat */
+  --radius-md: var(--radius);
+  --radius-xl: var(--radius-lg);
+
+  /* ── Shadows ──────────────────────────────────────────────────────── */
+  --shadow-2xs: rgba(0, 0, 0, 0.02) 0px 1px 2px;
+  --shadow-xs: rgba(0, 0, 0, 0.03) 0px 1px 2px;
+  --shadow-sm: rgba(0, 0, 0, 0.06) 0px 1px 2px;       /* button shadow */
+  --shadow: rgba(0, 0, 0, 0.03) 0px 2px 4px;           /* card ambient */
+  --shadow-md: rgba(0, 0, 0, 0.06) 0px 4px 8px;
+  --shadow-lg: rgba(0, 0, 0, 0.08) 0px 8px 16px;
+  --shadow-xl: rgba(0, 0, 0, 0.10) 0px 16px 32px;
+  --shadow-2xl: rgba(0, 0, 0, 0.14) 0px 24px 48px;
+
+  /* ── Motion ───────────────────────────────────────────────────────── */
+  --duration-fast: 150ms;
+  --duration-base: 200ms;
+  --duration-slow: 300ms;
+  --ease-out: cubic-bezier(0.0, 0.0, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.4, 0.0, 0.2, 1);
 }
 
+/* ── Dark Mode ──────────────────────────────────────────────────────── */
 .dark {
-  --background: oklch(0.21 0.02 226.02);
-  --foreground: oklch(0.81 0.04 226.14);
-  --card: oklch(0.23 0.03 218.18);
-  --card-foreground: oklch(0.70 0.04 225.59);
-  --popover: oklch(0.23 0.03 218.18);
-  --popover-foreground: oklch(0.94 0.05 196.31);
-  --primary: oklch(0.72 0.12 210.36);
-  --primary-foreground: oklch(1.00 0 0);
-  --secondary: oklch(0.27 0.01 285.81);
-  --secondary-foreground: oklch(0.97 0 0);
-  --muted: oklch(0.18 0.02 227.33);
-  --muted-foreground: oklch(0.58 0.03 223.55);
-  --accent: oklch(0.17 0.02 210.68);
-  --accent-foreground: oklch(0.97 0 0);
-  --destructive: oklch(0.64 0.21 25.39);
-  --border: oklch(0.36 0.02 213.25);
-  --input: oklch(0.29 0 0);
-  --ring: oklch(0.72 0.12 210.36);
-  --chart-1: oklch(0.72 0.12 210.36);
-  --chart-2: oklch(0.79 0.12 209.45);
-  --chart-3: oklch(0.76 0.11 208.70);
-  --chart-4: oklch(0.83 0.10 208.33);
-  --chart-5: oklch(0.57 0.10 213.73);
-  --sidebar: oklch(0.19 0 0);
-  --sidebar-foreground: oklch(0.97 0 0);
-  --sidebar-primary: oklch(0.72 0.12 210.36);
-  --sidebar-primary-foreground: oklch(1.00 0 0);
-  --sidebar-accent: oklch(0.24 0 0);
-  --sidebar-accent-foreground: oklch(0.97 0 0);
-  --sidebar-border: oklch(0.29 0 0);
-  --sidebar-ring: oklch(0.72 0.12 210.36);
+  --background: var(--color-near-black);
+  --foreground: #ededed;
 
-  --shadow-2xs: 0 1px 3px 0px oklch(0.00 0 0 / 0.05);
-  --shadow-xs: 0 1px 3px 0px oklch(0.00 0 0 / 0.05);
-  --shadow-sm: 0 1px 3px 0px oklch(0.00 0 0 / 0.10), 0 1px 2px -1px oklch(0.00 0 0 / 0.10);
-  --shadow: 0 1px 3px 0px oklch(0.00 0 0 / 0.10), 0 1px 2px -1px oklch(0.00 0 0 / 0.10);
-  --shadow-md: 0 1px 3px 0px oklch(0.00 0 0 / 0.10), 0 2px 4px -1px oklch(0.00 0 0 / 0.10);
-  --shadow-lg: 0 1px 3px 0px oklch(0.00 0 0 / 0.10), 0 4px 6px -1px oklch(0.00 0 0 / 0.10);
-  --shadow-xl: 0 1px 3px 0px oklch(0.00 0 0 / 0.10), 0 8px 10px -1px oklch(0.00 0 0 / 0.10);
-  --shadow-2xl: 0 1px 3px 0px oklch(0.00 0 0 / 0.25);
+  --card: #141414;
+  --card-foreground: #ededed;
+
+  --popover: #141414;
+  --popover-foreground: #ededed;
+
+  --primary: #ededed;
+  --primary-foreground: var(--color-near-black);
+
+  --secondary: var(--color-brand);
+  --secondary-foreground: var(--color-near-black);
+
+  --muted: #1a1a1a;
+  --muted-foreground: #a0a0a0;
+
+  --accent: #1a1a1a;
+  --accent-foreground: #ededed;
+
+  --destructive: var(--color-error);
+  --destructive-foreground: var(--color-pure-white);
+
+  --border: rgba(255, 255, 255, 0.08);
+  --border-medium: rgba(255, 255, 255, 0.12);
+
+  --input: rgba(255, 255, 255, 0.10);
+  --ring: var(--color-brand);
+
+  --sidebar: #0f0f0f;
+  --sidebar-foreground: #ededed;
+  --sidebar-primary: var(--color-brand);
+  --sidebar-primary-foreground: var(--color-near-black);
+  --sidebar-accent: #1a1a1a;
+  --sidebar-accent-foreground: #ededed;
+  --sidebar-border: rgba(255, 255, 255, 0.06);
+  --sidebar-ring: var(--color-brand);
+
+  --shadow: rgba(0, 0, 0, 0.4) 0px 2px 4px;
+  --shadow-md: rgba(0, 0, 0, 0.5) 0px 4px 8px;
+  --shadow-lg: rgba(0, 0, 0, 0.6) 0px 8px 16px;
 }
 
+/* ── Tailwind v4 @theme inline ──────────────────────────────────────── */
 @theme inline {
+  /* Surface */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -121,14 +190,41 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+
+  /* Brand */
+  --color-brand: var(--color-brand);
+  --color-brand-light: var(--color-brand-light);
+  --color-brand-deep: var(--color-brand-deep);
+
+  /* Neutrals */
+  --color-gray-900: var(--color-gray-900);
+  --color-gray-700: var(--color-gray-700);
+  --color-gray-500: var(--color-gray-500);
+  --color-gray-400: var(--color-gray-400);
+  --color-gray-200: var(--color-gray-200);
+  --color-gray-100: var(--color-gray-100);
+  --color-gray-50: var(--color-gray-50);
+
+  /* Status */
+  --color-error: var(--color-error);
+  --color-error-bg: var(--color-error-bg);
+  --color-amber: var(--color-amber);
+  --color-amber-bg: var(--color-amber-bg);
+  --color-success: var(--color-success);
+  --color-success-bg: var(--color-success-bg);
+
+  /* Charts */
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+
+  /* Sidebar */
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -138,15 +234,20 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
+  /* Typography */
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
   --font-serif: var(--font-serif);
 
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  /* Radius */
+  --radius-xs: var(--radius-xs);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+  --radius-full: var(--radius-full);
 
+  /* Shadows */
   --shadow-2xs: var(--shadow-2xs);
   --shadow-xs: var(--shadow-xs);
   --shadow-sm: var(--shadow-sm);
