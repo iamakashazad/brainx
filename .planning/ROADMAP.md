@@ -86,8 +86,8 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 04-01: Upload flow plus persona form and multipart submit path
-- [ ] 04-02: Processing view with polling and stage progress indicators
+- [x] 04-01: Upload flow plus persona form and multipart submit path
+- [x] 04-02: Processing view with polling and stage progress indicators
 - [ ] 04-03: Results view with overlays, 3D brain visualization, metric scores, and recommendations panel
 
 ### Phase 5: Session Persistence, Demo, and Polish
@@ -97,9 +97,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 05-01: Session history API and frontend view
-- [ ] 05-02: Pre-built demo case study backed by real stored analysis data
-- [ ] 05-03: Production hardening — timeout watchdog, queue depth guard, UI label audit
+- [x] 05-01-PLAN.md — Session history API + HistoryView root screen + wizard overlay (FE-04)
+- [x] 05-02-PLAN.md — Demo fixture + DemoCard + theme toggle + shareable /results/:jobId URL (FE-03, D-11, D-12)
+- [x] 05-03-PLAN.md — Production hardening: timeout watchdog, queue depth 503 guard, UI label audit (D-08, D-09, D-10)
 
 ## Progress
 
@@ -110,5 +110,5 @@ Plans:
 | 3. Full Pipeline Integration and Recommendations | 5/5 | Complete | 2026-04-18 |
 | 3.1. Runtime Fallback Wiring and Pathway Closure | 2/2 | Complete    | 2026-04-18 |
 | 3.2. Verification and Traceability Reconciliation | 5/5 | Complete | 2026-04-20 |
-| 4. Frontend — Upload, Persona, and Results | 0/3 | Not started | - |
+| 4. Frontend — Upload, Persona, and Results | 2/3 | In progress | - |
 | 5. Session Persistence, Demo, and Polish | 0/3 | Not started | - |
