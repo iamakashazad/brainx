@@ -20,7 +20,7 @@ from backend.models.simulation import DeepSeekClientError, HallucinationError, S
 from backend.services.continuity import compute_flow_continuity
 from backend.services import grounding, simulation
 from backend.services.recommendations import generate_recommendations
-from backend.services.inference import run_tribev2_text, run_tribev2_video
+from backend.services.inference import recycle_gpu_executor, run_tribev2_text, run_tribev2_video
 from backend.services.overlay import derive_overlays
 from backend.services.pathway_config import resolve_runtime_pathway
 from backend.services.process_guard import cleanup_workspace_whisperx_processes
@@ -37,6 +37,8 @@ from backend.services.video_slideshow import (
 )
 
 logger = logging.getLogger(__name__)
+
+QUEUE_DEPTH_LIMIT = 3
 
 gpu_queue: asyncio.Queue[str] = asyncio.Queue()
 queue_capacity_lock = asyncio.Lock()
@@ -196,6 +198,22 @@ def _save_per_screen_activations(
     return activations_manifest
 
 
+async def supervised_worker_loop() -> None:
+    """Keep the worker alive across crashes so queued jobs are never stranded."""
+    while True:
+        try:
+            await gpu_worker_loop()
+        except asyncio.CancelledError:
+            task = asyncio.current_task()
+            if task is None or task.cancelling():
+                raise
+            logger.exception("gpu worker loop cancelled internally; restarting in 1s")
+            await asyncio.sleep(1)
+        except Exception:
+            logger.exception("gpu worker loop crashed; restarting in 1s")
+            await asyncio.sleep(1)
+
+
 async def gpu_worker_loop() -> None:
     while True:
         job_id = await gpu_queue.get()
@@ -207,10 +225,38 @@ async def gpu_worker_loop() -> None:
                 )
         except TimeoutError:
             logger.error("job %s timed out after %s seconds", job_id, settings.job_timeout_seconds)
+            recycle_gpu_executor()
+            logger.error(
+                "recycled inference executor; a hung inference thread may remain until "
+                "the backend restarts — restart the backend if timeouts repeat"
+            )
             await _mark_timed_out(job_id, settings.job_timeout_seconds)
+        except asyncio.CancelledError:
+            task = asyncio.current_task()
+            if task is None or task.cancelling():
+                raise
+            logger.exception("job %s was cancelled internally", job_id)
+            await _mark_failed(job_id, RuntimeError("job was cancelled internally"))
+        except Exception as exc:
+            logger.exception("job %s failed outside the pipeline error handler", job_id)
+            await _mark_failed(job_id, exc)
         finally:
             cancel_requested.discard(job_id)
             gpu_queue.task_done()
+
+
+async def _mark_failed(job_id: str, exc: BaseException) -> None:
+    try:
+        async with database.async_session() as session:
+            job = (await session.execute(select(Job).where(Job.id == job_id))).scalar_one_or_none()
+            if job is None:
+                return
+            job.status = "ERROR"
+            job.queue_position = None
+            job.error_message = f"Analysis failed: {exc}"
+            await session.commit()
+    except Exception:
+        logger.exception("could not mark job %s as ERROR", job_id)
 
 
 async def _mark_timed_out(job_id: str, timeout_seconds: int) -> None:

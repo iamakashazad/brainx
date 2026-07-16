@@ -12,7 +12,7 @@ from backend.models.persona import Persona
 from backend.models.schemas import AnalyzeRequest, AnalyzeResponse
 
 router = APIRouter()
-QUEUE_DEPTH_LIMIT = 3
+QUEUE_DEPTH_LIMIT = queue_manager.QUEUE_DEPTH_LIMIT
 
 
 @router.post("", response_model=AnalyzeResponse, status_code=status.HTTP_201_CREATED)

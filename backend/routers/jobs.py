@@ -25,7 +25,10 @@ def _utcnow() -> dt.datetime:
 
 
 def _should_mark_stale_active(job: Job, now: dt.datetime) -> bool:
-    if job.status not in {"PENDING", "RUNNING"}:
+    # Only PENDING jobs go stale here: a pending job past the timeout means the
+    # worker never picked it up. RUNNING jobs are owned by the worker's own
+    # asyncio.wait_for timeout — long CPU inference must not be killed by polling.
+    if job.status != "PENDING":
         return False
 
     last_progress = job.updated_at or job.created_at
@@ -66,19 +69,27 @@ def _status_message(job: Job, runtime_seconds: int | None, stale_processes: int)
 
 @router.post("/test-inference", response_model=TestInferenceResponse)
 async def submit_test_inference(request: TestInferenceRequest) -> TestInferenceResponse:
-    job = Job(
-        id=str(uuid.uuid4()),
-        status="PENDING",
-        queue_position=queue_manager.gpu_queue.qsize() + 1,
-        input_path=request.text,
-        input_type=request.input_type,
-    )
+    async with queue_manager.queue_capacity_lock:
+        if queue_manager.gpu_queue.qsize() >= queue_manager.QUEUE_DEPTH_LIMIT:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="The analysis queue is full. Please try again in a moment.",
+            )
 
-    async with database.async_session() as session:
-        session.add(job)
-        await session.commit()
+        job = Job(
+            id=str(uuid.uuid4()),
+            status="PENDING",
+            queue_position=queue_manager.gpu_queue.qsize() + 1,
+            input_path=request.text,
+            input_type=request.input_type,
+        )
 
-    await queue_manager.gpu_queue.put(job.id)
+        async with database.async_session() as session:
+            session.add(job)
+            await session.commit()
+
+        await queue_manager.gpu_queue.put(job.id)
+
     await queue_manager.sync_pending_queue_positions()
 
     return TestInferenceResponse(

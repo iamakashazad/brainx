@@ -11,6 +11,7 @@ from backend.core.database import init_db
 from backend.core import queue as queue_manager
 from backend.ml.tribe_loader import load_model
 from backend.routers import activations, analyze, content, health, jobs, personas
+from backend.services.inference import recycle_gpu_executor
 from backend.services.process_guard import cleanup_workspace_whisperx_processes
 
 
@@ -27,7 +28,7 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         raise RuntimeError(f"TRIBEv2 failed to load: {exc}") from exc
 
-    worker_task = asyncio.create_task(queue_manager.gpu_worker_loop())
+    worker_task = asyncio.create_task(queue_manager.supervised_worker_loop())
     app.state.worker_task = worker_task
 
     try:
@@ -36,6 +37,9 @@ async def lifespan(app: FastAPI):
         worker_task.cancel()
         with suppress(asyncio.CancelledError):
             await worker_task
+        # Recycle rather than shutdown: leaves a fresh usable executor so
+        # repeated app lifecycles (tests, dev reload) don't inherit a dead one.
+        recycle_gpu_executor()
 
 
 def create_app() -> FastAPI:
