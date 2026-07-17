@@ -78,3 +78,14 @@ Change 3 is required to get past the VAD load step before transcription
 runs. With all three changes applied, the text pathway reaches
 Llama-3.2-3B feature extraction (gated HuggingFace model, requires
 HF_TOKEN + accepted terms).
+
+=== Change 3 (2026-07-17): Retry flaky whisperx subprocess ===
+
+`uvx whisperx` occasionally exits nonzero with an EMPTY stderr on a cold
+invocation (observed after macOS/CommandLineTools updates while uv refreshes
+the cached tool environment). A single flaky call previously failed the whole
+analysis job even though an immediate retry succeeds.
+
+Fix in _get_transcript_from_audio: run the whisperx subprocess up to 3 times
+(2s pause between attempts) and include the returncode plus the stderr tail
+in the error message when all attempts fail.

@@ -29,7 +29,30 @@ def _http_error_message(exc: Exception) -> str:
     return f"Vision analysis failed: {exc}"
 
 
+_version_cache: dict[str, str] = {}
+
+
 class ReplicateVL2Backend:
+    async def _resolve_version(self, client: httpx.AsyncClient) -> str:
+        """Community models require a version hash on /v1/predictions."""
+        slug = settings.vision_model
+        cached = _version_cache.get(slug)
+        if cached:
+            return cached
+
+        response = await client.get(
+            f"{REPLICATE_BASE}/v1/models/{slug}",
+            headers={"Authorization": f"Bearer {settings.replicate_api_token}"},
+        )
+        response.raise_for_status()
+        version = (response.json().get("latest_version") or {}).get("id")
+        if not version:
+            raise DeepSeekClientError(
+                f"Replicate model {slug} has no published version to run."
+            )
+        _version_cache[slug] = version
+        return version
+
     async def analyze(
         self,
         images: list[Path],
@@ -55,21 +78,22 @@ class ReplicateVL2Backend:
                     for path in images
                 ]
             )
-            payload = {
-                "input": {
-                    "image": encoded_images[0] if encoded_images else None,
-                    "images": encoded_images,
-                    "prompt": full_prompt,
-                    "max_new_tokens": max_tokens,
-                    "temperature": temperature,
-                },
-            }
-            # The model-scoped endpoint accepts an owner/name slug and runs the
-            # latest version; the bare /v1/predictions endpoint requires a
-            # version hash and rejects slugs.
             async with httpx.AsyncClient(timeout=120.0) as client:
+                version = await self._resolve_version(client)
+                # deepseek-vl2 accepts a single `image` input plus
+                # `max_length_tokens` (not max_new_tokens); unknown keys are
+                # rejected. Multi-screen callers get first-image analysis.
+                payload = {
+                    "version": version,
+                    "input": {
+                        "image": encoded_images[0] if encoded_images else None,
+                        "prompt": full_prompt,
+                        "max_length_tokens": max_tokens,
+                        "temperature": temperature,
+                    },
+                }
                 response = await client.post(
-                    f"{REPLICATE_BASE}/v1/models/{settings.vision_model}/predictions",
+                    f"{REPLICATE_BASE}/v1/predictions",
                     headers={"Authorization": f"Bearer {settings.replicate_api_token}"},
                     json=payload,
                 )
@@ -85,7 +109,9 @@ class ReplicateVL2Backend:
         return "".join(output) if isinstance(output, list) else str(output)
 
     async def _resolve_output(self, client: httpx.AsyncClient, data: dict) -> str | list[str]:
-        if "output" in data:
+        # The creation response carries "output": null while the prediction is
+        # still starting — only short-circuit once output actually exists.
+        if data.get("output") is not None:
             return data["output"]
 
         get_url = data["urls"]["get"]
