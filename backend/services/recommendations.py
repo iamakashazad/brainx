@@ -493,8 +493,9 @@ async def generate_recommendations(
     normalized_persona = _normalize_persona(persona)
     retry_reason: str | None = None
 
+    max_attempts = 3
     try:
-        for attempt in (1, 2):
+        for attempt in range(1, max_attempts + 1):
             user_prompt = build_rec_user_prompt(
                 normalized_persona,
                 normalized_sim_log.model_dump(),
@@ -523,7 +524,7 @@ async def generate_recommendations(
                     recommendations,
                 )
             except ValueError as exc:
-                if attempt == 1:
+                if attempt < max_attempts:
                     retry_reason = str(exc)
                     continue
                 raise
