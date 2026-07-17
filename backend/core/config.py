@@ -29,3 +29,13 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+def missing_required_keys() -> list[str]:
+    """API keys without which every analysis job would fail at runtime."""
+    missing: list[str] = []
+    if not settings.deepseek_api_key:
+        missing.append("DEEPSEEK_API_KEY")
+    if settings.vision_provider == "replicate" and not settings.replicate_api_token:
+        missing.append("REPLICATE_API_TOKEN")
+    return missing

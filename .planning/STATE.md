@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Resumed Phase 5 work; centralized reusable UI primitives into frontend/src/components/design-system.tsx and kept design-system usage to components
-last_updated: "2026-04-30T11:53:32.401Z"
+stopped_at: Remediation pass complete — worker resilience, executor recycle, frontend terminal states, honest error messages, Replicate endpoint fix, stale sweeper, docs reconciled
+last_updated: "2026-07-16T00:00:00.000Z"
 progress:
   total_phases: 7
-  completed_phases: 6
+  completed_phases: 7
   total_plans: 27
-  completed_plans: 24
-  percent: 89
+  completed_plans: 27
+  percent: 100
 ---
 
 # Project State — BrainX
@@ -60,12 +60,12 @@ Initialization checklist:
 
 ## Blockers / Concerns
 
-- No active backend blocker remains for the analyze-to-results pipeline (SIM-04 test-harness regression repaired in 03.2-04; shipped backend was never broken)
-- Phase 4 frontend execution is the next planned workstream
-- Phase 5 persistence/demo work remains open after the frontend
+- Phase 4 UAT tests 1, 11, 13-16 need a confirmed green cold-start E2E run (remediation of 2026-07-16 fixed the stuck-loop causes: worker crash leaving jobs PENDING, executor poisoning after a hung inference, infinite frontend polling, ResultsPage ERROR dead end, and misleading sanitized errors)
+- Phase 5 human browser UAT checks (4) remain pending — .planning/phases/05-session-persistence-demo-and-polish/05-HUMAN-UAT.md
+- Image-content path was never live-verified; the Replicate call previously used the wrong endpoint shape (fixed 2026-07-16) and needs one smoke test with a real token
 
 ## Session Continuity
 
-Last session: 2026-04-30T12:17:00Z
-Stopped at: Phase 5 execution complete; verification status human_needed with 4 browser UAT checks saved
+Last session: 2026-07-16
+Stopped at: Remediation pass (audit → P0 stuck-loop fixes → P1 error transparency → P2 hygiene) committed; backend suite green (167 passed)
 Resume file: .planning/phases/05-session-persistence-demo-and-polish/05-HUMAN-UAT.md

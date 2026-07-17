@@ -1,6 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Check, Loader2, Sparkles } from "lucide-react";
 import { useState } from "react";
+import type { CSSProperties } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { suggestPersonaField } from "@/lib/api";
 import type { PersonaRead } from "@/lib/api-types";
@@ -19,7 +20,7 @@ type PersonaFormProps = {
 const STEPS = ["Demographics", "Psychographics", "Cognitive State", "Environment"] as const;
 type StepIndex = 0 | 1 | 2 | 3;
 
-const fieldStyle: React.CSSProperties = {
+const fieldStyle: CSSProperties = {
   width: "100%",
   borderRadius: "var(--radius-full)",
   border: "1px solid var(--border-medium)",
@@ -32,7 +33,7 @@ const fieldStyle: React.CSSProperties = {
   fontFamily: "var(--font-sans)",
 };
 
-const textareaStyle: React.CSSProperties = {
+const textareaStyle: CSSProperties = {
   ...fieldStyle,
   borderRadius: "var(--radius)",
   minHeight: "88px",
@@ -40,7 +41,7 @@ const textareaStyle: React.CSSProperties = {
   padding: "10px 16px",
 };
 
-const selectStyle: React.CSSProperties = {
+const selectStyle: CSSProperties = {
   ...fieldStyle,
   appearance: "none",
   cursor: "pointer",

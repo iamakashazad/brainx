@@ -12,6 +12,7 @@
  * Design tokens: brand, border, card, primary, secondary, radius-full
  */
 
+import type { CSSProperties } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import * as Tabs from "@radix-ui/react-tabs";
 import { ArrowLeft } from "lucide-react";
@@ -27,7 +28,7 @@ const STEPS = ["Persona", "Content", "Review"] as const;
 
 /* ── Pill Tab trigger style ───────────────────────────────────────────── */
 
-const tabTriggerStyle = (isActive: boolean): React.CSSProperties => ({
+const tabTriggerStyle = (isActive: boolean): CSSProperties => ({
   padding: "6px 16px",
   borderRadius: "var(--radius-full)",
   fontSize: "14px",

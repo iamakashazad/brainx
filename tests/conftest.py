@@ -39,6 +39,10 @@ async def client(tmp_path, monkeypatch) -> AsyncClient:
 
     monkeypatch.setattr(settings, "database_url", db_url)
     monkeypatch.setattr(settings, "uploads_dir", tmp_path / "uploads")
+    # Hermetic provider keys: tests must not depend on real values in .env.
+    # Tests that assert missing-key behavior monkeypatch these back to "".
+    monkeypatch.setattr(settings, "deepseek_api_key", "test-deepseek-key")
+    monkeypatch.setattr(settings, "replicate_api_token", "test-replicate-token")
     monkeypatch.setattr(database, "engine", test_engine)
     monkeypatch.setattr(database, "async_session", test_session)
     monkeypatch.setattr(queue_manager, "gpu_queue", asyncio.Queue())

@@ -169,6 +169,22 @@ async def test_status_poll_marks_stale_pending_job_error(client, monkeypatch):
     assert "timed out" in body["error"].lower()
 
 
+async def test_sweeper_marks_stale_pending_job_without_any_poll(client, monkeypatch):
+    monkeypatch.setattr(settings, "job_timeout_seconds", 1)
+    stale_time = dt.datetime.utcnow() - dt.timedelta(seconds=40)
+    await _insert_pending_job("sweeper-pending-job", stale_time)
+    await _insert_running_job("sweeper-running-job", stale_time)
+
+    flipped = await queue_manager.mark_stale_active_jobs()
+
+    assert flipped == 1
+    pending = await _get_job("sweeper-pending-job")
+    running = await _get_job("sweeper-running-job")
+    assert pending.status == "ERROR"
+    assert "timed out" in (pending.error_message or "").lower()
+    assert running.status == "RUNNING"
+
+
 async def test_startup_recovery_marks_interrupted_active_jobs_error(client):
     await _insert_pending_job("interrupted-pending", dt.datetime.utcnow())
     await _insert_running_job("interrupted-running", dt.datetime.utcnow())

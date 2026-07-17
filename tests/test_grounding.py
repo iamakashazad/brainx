@@ -71,14 +71,12 @@ async def test_clean_passes_through(tmp_path, monkeypatch):
     assert verdict.hallucinations == []
 
 
-async def test_provider_errors_fail_closed(tmp_path, monkeypatch):
+async def test_provider_errors_fail_closed_with_real_cause(tmp_path, monkeypatch):
     from backend.core.config import settings
 
     monkeypatch.setattr(settings, "uploads_dir", tmp_path)
     fake_provider = AsyncMock()
     fake_provider.analyze.side_effect = OSError("missing upload")
     with patch("backend.services.grounding.get_provider", return_value=fake_provider):
-        with pytest.raises(HallucinationError) as exc_info:
+        with pytest.raises(RuntimeError, match="could not read uploaded images"):
             await grounding.judge(_ui_content(tmp_path), _sim_log())
-
-    assert exc_info.value.items == []

@@ -19,6 +19,7 @@ import { DemoCard } from "@/features/history/DemoCard";
 import { DemoOverlay } from "@/features/history/DemoOverlay";
 import { useJobHistory } from "@/features/history/useJobHistory";
 import { usePersonasQuery } from "@/features/persona/usePersonas";
+import { useWizardStore } from "@/stores/wizardStore";
 import type { JobSummary } from "@/lib/api-types";
 
 /* ── Session Card ─────────────────────────────────────────────────────── */
@@ -191,7 +192,11 @@ export function DashboardPage() {
   const showHero = !jobsQuery.isLoading && jobs.length === 0;
   const showCollapsedHeader = jobs.length >= 3;
 
-  const handleNewAnalysis = () => navigate("/analysis/new");
+  const resetWizard = useWizardStore((s) => s.reset);
+  const handleNewAnalysis = () => {
+    resetWizard();
+    navigate("/analysis/new");
+  };
   const handleOpenSession = (jobId: string) =>
     navigate(`/analysis/${jobId}/results`);
 

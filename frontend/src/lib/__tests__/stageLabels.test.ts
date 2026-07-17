@@ -79,8 +79,20 @@ describe("stageLabels", () => {
     expect(displayFailureBodyFor("Job timed out after 600 seconds")).toBe(DISPLAY_TIMEOUT_BODY);
   });
 
-  it("returns default failure copy for non-timeout errors", () => {
+  it("returns default failure copy only when no error message exists", () => {
     expect(displayFailureBodyFor(null)).toBe(DISPLAY_FAILED_BODY);
-    expect(displayFailureBodyFor("Inference failed")).toBe(DISPLAY_FAILED_BODY);
+    expect(displayFailureBodyFor(undefined)).toBe(DISPLAY_FAILED_BODY);
+  });
+
+  it("surfaces the real backend error message", () => {
+    expect(displayFailureBodyFor("Inference failed")).toBe("Inference failed");
+  });
+
+  it("prefixes the failing stage when known", () => {
+    expect(
+      displayFailureBodyFor("DeepSeek request failed (HTTP 401). Please retry.", "simulation"),
+    ).toBe(
+      "Failed during persona simulation: DeepSeek request failed (HTTP 401). Please retry.",
+    );
   });
 });

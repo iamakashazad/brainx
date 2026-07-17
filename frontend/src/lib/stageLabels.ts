@@ -90,7 +90,19 @@ export function displayStatusForStage(status: JobStatus): string {
   return "RUNNING";
 }
 
-export function displayFailureBodyFor(errorMessage: string | null | undefined): string {
+const STAGE_FAILURE_LABEL: Record<StageValue, string> = {
+  simulation: "persona simulation",
+  grounding_check: "grounding check",
+  inference: "brain inference",
+  roi_aggregation: "brain region aggregation",
+  processing: "result processing",
+  recommendations: "recommendation generation",
+};
+
+export function displayFailureBodyFor(
+  errorMessage: string | null | undefined,
+  stage?: StageValue | null,
+): string {
   const normalizedError = errorMessage?.toLowerCase() ?? "";
 
   if (normalizedError.includes("timed out")) {
@@ -99,6 +111,13 @@ export function displayFailureBodyFor(errorMessage: string | null | undefined): 
 
   if (normalizedError.includes("interrupted")) {
     return DISPLAY_INTERRUPTED_BODY;
+  }
+
+  // The backend now preserves the failing stage and reports real error
+  // messages — surface them instead of hiding behind generic copy.
+  if (errorMessage) {
+    const prefix = stage ? `Failed during ${STAGE_FAILURE_LABEL[stage] ?? stage}: ` : "";
+    return `${prefix}${errorMessage}`;
   }
 
   return DISPLAY_FAILED_BODY;

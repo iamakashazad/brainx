@@ -1,4 +1,3 @@
-import type React from "react";
 import { render, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useWizardStore } from "@/stores/wizardStore";
@@ -12,7 +11,9 @@ const useActivation = vi.fn((_jobId: string | null, _screenIndex: number) => ({
 }));
 
 vi.mock("@react-three/fiber", () => ({
-  Canvas: ({ children }: { children: React.ReactNode }) => <div data-testid="brain-canvas">{children}</div>,
+  // Do NOT render children: react-dom would serialize the Float32Array args
+  // of the three.js elements into jsdom attributes and exhaust the heap.
+  Canvas: () => <div data-testid="brain-canvas" />,
 }));
 
 vi.mock("@react-three/drei", () => ({
@@ -24,25 +25,24 @@ vi.mock("../useActivation", () => ({
   useActivation: (jobId: string | null, screenIndex: number) => useActivation(jobId, screenIndex),
 }));
 
+// Mock query results must be referentially stable across renders — fresh
+// objects per call retrigger BrainCanvas's effect every render (infinite loop).
+const meshData = {
+  positions: new Float32Array(20484 * 3),
+  indices: new Uint32Array(12),
+};
+const parcellationData = {
+  labels: ["Unknown", "Attention"],
+  circuitOfLabelIndex: [null, "Attention"],
+  vertexToLabelIndex: Array.from({ length: 20484 }, () => 1),
+};
+
 vi.mock("../useMeshGeometry", () => ({
-  useMeshGeometry: () => ({
-    data: {
-      positions: new Float32Array(20484 * 3),
-      indices: new Uint32Array(12),
-    },
-    isLoading: false,
-  }),
+  useMeshGeometry: () => ({ data: meshData, isLoading: false }),
 }));
 
 vi.mock("../useParcellation", () => ({
-  useParcellation: () => ({
-    data: {
-      labels: ["Unknown", "Attention"],
-      circuitOfLabelIndex: [null, "Attention"],
-      vertexToLabelIndex: Array.from({ length: 20484 }, () => 1),
-    },
-    isLoading: false,
-  }),
+  useParcellation: () => ({ data: parcellationData, isLoading: false }),
 }));
 
 vi.mock("../colorBuffer", () => ({

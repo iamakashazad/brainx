@@ -16,3 +16,5 @@ build/
 uploads/
 screenshot-*.png
 .playwright-mcp/
+*.tsbuildinfo
+node_modules/

@@ -43,6 +43,7 @@ import { Button, PillButton, Surface } from "@/components/design-system";
 import { useJobStatus } from "@/features/run/useJobStatus";
 import { usePersonasQuery } from "@/features/persona/usePersonas";
 import { useWizardStore } from "@/stores/wizardStore";
+import { AnalysisFailureCard } from "@/components/AnalysisFailureCard";
 
 import { BrainCanvas } from "@/features/results/BrainCanvas";
 import { CircuitScoreBar } from "@/features/results/CircuitScoreBar";
@@ -559,16 +560,24 @@ export function ResultsPage() {
   const jobQuery = useJobStatus(jobId ?? null);
   const personasQuery = usePersonasQuery();
 
+  // If still running, redirect to running page (effect, not during render)
+  const jobStatus = jobQuery.data?.status;
+  useEffect(() => {
+    if (jobId && (jobStatus === "RUNNING" || jobStatus === "PENDING")) {
+      navigate(`/analysis/${jobId}/running`, { replace: true });
+    }
+  }, [jobStatus, jobId, navigate]);
+
   if (!jobId) return null;
 
   const job = jobQuery.data;
   const result = job?.result ?? null;
+  const isRedirecting = job?.status === "RUNNING" || job?.status === "PENDING";
+  const showFailure =
+    !isRedirecting &&
+    (job?.status === "ERROR" || (jobQuery.isError && !jobQuery.isFetching));
 
-  // If still running, redirect to running page
-  if (job?.status === "RUNNING" || job?.status === "PENDING") {
-    navigate(`/analysis/${jobId}/running`, { replace: true });
-    return null;
-  }
+  if (isRedirecting) return null;
 
   const personas = personasQuery.data ?? [];
   const personaName =
@@ -633,8 +642,19 @@ export function ResultsPage() {
           </div>
         )}
 
+        {/* Failed job / unreachable job — terminal error card */}
+        {!jobQuery.isLoading && showFailure && (
+          <AnalysisFailureCard
+            errorMessage={job?.error}
+            stage={job?.stage}
+            onRetry={() => navigate("/analysis/new/content")}
+            onBack={() => navigate("/")}
+            backLabel="Back to Dashboard"
+          />
+        )}
+
         {/* No result yet */}
-        {!jobQuery.isLoading && !result && (
+        {!jobQuery.isLoading && !showFailure && !result && (
           <div
             className="py-16 text-center rounded-2xl"
             style={{

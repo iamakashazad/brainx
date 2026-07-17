@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import datetime as dt
 import uuid
 
@@ -7,7 +8,6 @@ from fastapi import APIRouter, HTTPException, Response, status
 from sqlalchemy import select
 
 from backend.core import database, queue as queue_manager
-from backend.core.config import settings
 from backend.models.job import Job
 from backend.models.schemas import (
     JobStatusResponse,
@@ -22,31 +22,6 @@ router = APIRouter()
 
 def _utcnow() -> dt.datetime:
     return dt.datetime.utcnow()
-
-
-def _should_mark_stale_active(job: Job, now: dt.datetime) -> bool:
-    # Only PENDING jobs go stale here: a pending job past the timeout means the
-    # worker never picked it up. RUNNING jobs are owned by the worker's own
-    # asyncio.wait_for timeout — long CPU inference must not be killed by polling.
-    if job.status != "PENDING":
-        return False
-
-    last_progress = job.updated_at or job.created_at
-    if last_progress is None:
-        return False
-
-    stale_after = settings.job_timeout_seconds + 30
-    return (now - last_progress).total_seconds() > stale_after
-
-
-def _mark_stale_active_job(job: Job) -> None:
-    job.status = "ERROR"
-    job.stage = None
-    job.queue_position = None
-    job.error_message = (
-        f"Analysis timed out after no progress for {settings.job_timeout_seconds} seconds. "
-        "The worker may have stopped or the content may be too large."
-    )
 
 
 def _runtime_seconds(job: Job, now: dt.datetime) -> int | None:
@@ -106,14 +81,16 @@ async def get_job_status(job_id: str) -> JobStatusResponse:
         result = await session.execute(select(Job).where(Job.id == job_id))
         job = result.scalar_one_or_none()
 
-        if job is not None and _should_mark_stale_active(job, now):
-            _mark_stale_active_job(job)
+        if job is not None and queue_manager.should_mark_stale_active(job, now):
+            queue_manager.mark_stale_active_job(job)
             await session.commit()
 
     if job is None:
         raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
 
-    inference_processes = workspace_whisperx_count() if job.stage == "inference" else 0
+    inference_processes = (
+        await asyncio.to_thread(workspace_whisperx_count) if job.stage == "inference" else 0
+    )
     stale_inference_processes = max(0, inference_processes - 2)
     runtime_seconds = _runtime_seconds(job, now)
 

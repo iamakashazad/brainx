@@ -149,8 +149,17 @@ def test_skips_cleanly_without_key(monkeypatch: pytest.MonkeyPatch):
 
 @skip_without_live_key
 @pytest.mark.asyncio
-async def test_blind_eval_differentiates_opposite_profiles(sim_log_3_screens, persona_model_fixture):
+async def test_blind_eval_differentiates_opposite_profiles(
+    sim_log_3_screens,
+    persona_model_fixture,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    from backend.core.config import settings
     from backend.services.recommendations import generate_recommendations
+
+    # The client fixture installs a hermetic dummy key; this test is explicitly
+    # live (D-18) and needs the real one back.
+    monkeypatch.setattr(settings, "deepseek_api_key", os.environ["DEEPSEEK_API_KEY"])
 
     high_bundle = _make_high_cog_load_low_reward_bundle()
     low_bundle = _make_low_cog_load_high_reward_bundle()

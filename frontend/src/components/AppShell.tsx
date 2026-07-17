@@ -15,9 +15,11 @@
  */
 
 import { useState } from "react";
+import type { ReactNode } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { LayoutDashboard, Users, Menu, X, Zap } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
+import { useWizardStore } from "@/stores/wizardStore";
 
 const NAV_ITEMS = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard, end: true },
@@ -46,7 +48,9 @@ function BrainXLogo() {
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const navigate = useNavigate();
 
+  const resetWizard = useWizardStore((s) => s.reset);
   const handleNewAnalysis = () => {
+    resetWizard();
     onNavigate?.();
     navigate("/analysis/new");
   };
@@ -127,7 +131,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 }
 
 type AppShellProps = {
-  children: React.ReactNode;
+  children: ReactNode;
 };
 
 export function AppShell({ children }: AppShellProps) {

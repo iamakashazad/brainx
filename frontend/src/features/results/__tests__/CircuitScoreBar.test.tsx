@@ -33,6 +33,6 @@ describe("CircuitScoreBar", () => {
     const { container } = render(<CircuitScoreBar circuit="Attention" score={77} />);
 
     expect(screen.getByText("77.0")).toBeInTheDocument();
-    expect(container.querySelector(".font-mono")).not.toBeNull();
+    expect(screen.getByText("77.0").getAttribute("style") ?? "").toContain("font-mono");
   });
 });

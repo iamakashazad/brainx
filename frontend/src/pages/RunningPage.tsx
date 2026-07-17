@@ -15,12 +15,12 @@ import { useEffect, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Check, AlertTriangle, RotateCcw, ArrowLeft, Square } from "lucide-react";
+import { Check, AlertTriangle, ArrowLeft, Square } from "lucide-react";
 import { useJobStatus } from "@/features/run/useJobStatus";
 import { useSubmitAnalyze } from "@/features/wizard/useSubmitAnalyze";
 import { useWizardStore } from "@/stores/wizardStore";
 import { deleteJob } from "@/lib/api";
-import { displayFailureBodyFor } from "@/lib/stageLabels";
+import { AnalysisFailureCard } from "@/components/AnalysisFailureCard";
 import type { JobStatus, StageValue } from "@/lib/api-types";
 
 /* ── Stage configuration ──────────────────────────────────────────────── */
@@ -74,6 +74,7 @@ function getActiveIndex(stage: StageValue | null, status: JobStatus): number {
 
 function getAmbientLabel(stage: StageValue | null, status: JobStatus): string {
   if (status === "DONE") return "Analysis complete";
+  if (status === "RUNNING" && !stage) return "Starting analysis…";
   if (status === "PENDING" || !stage) return "Queued — waiting to start…";
   const step = STAGE_STEPS.find((s) => s.key === stage);
   return step?.label ?? "Processing…";
@@ -138,84 +139,6 @@ function StageRail({
   );
 }
 
-/* ── Failure State ────────────────────────────────────────────────────── */
-
-function FailureState({
-  errorMessage,
-  onRetry,
-  onBack,
-}: {
-  errorMessage?: string | null;
-  onRetry: () => void;
-  onBack: () => void;
-}) {
-  const body = displayFailureBodyFor(errorMessage);
-
-  return (
-    <div className="flex min-h-[60vh] items-center justify-center px-4">
-      <div
-        className="w-full max-w-xl"
-        style={{
-          background: "var(--card)",
-          border: "1px solid var(--border)",
-          borderRadius: "var(--radius-lg)",
-          padding: "40px",
-          boxShadow: "var(--shadow-md)",
-        }}
-      >
-        <div className="flex items-start gap-4">
-          <span
-            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
-            style={{ background: "var(--color-error-bg)", color: "var(--color-error)" }}
-          >
-            <AlertTriangle className="h-5 w-5" />
-          </span>
-          <div className="space-y-2">
-            <h2
-              className="font-semibold"
-              style={{ fontSize: "20px", letterSpacing: "-0.2px", color: "var(--foreground)" }}
-            >
-              Analysis failed
-            </h2>
-            <p className="text-sm" style={{ color: "var(--muted-foreground)", lineHeight: "1.6" }}>
-              {body}
-            </p>
-          </div>
-        </div>
-        <div className="mt-8 flex flex-wrap gap-3">
-          <button
-            type="button"
-            onClick={onRetry}
-            className="inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium transition"
-            style={{
-              background: "var(--primary)",
-              color: "var(--primary-foreground)",
-              borderRadius: "var(--radius-full)",
-              boxShadow: "var(--shadow-sm)",
-            }}
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
-            Try Again
-          </button>
-          <button
-            type="button"
-            onClick={onBack}
-            className="inline-flex items-center rounded-full px-5 py-2.5 text-sm font-medium transition"
-            style={{
-              background: "transparent",
-              color: "var(--foreground)",
-              border: "1px solid var(--border-medium)",
-              borderRadius: "var(--radius-full)",
-            }}
-          >
-            Go Back
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 /* ── Page ─────────────────────────────────────────────────────────────── */
 
 export function RunningPage() {
@@ -275,8 +198,9 @@ export function RunningPage() {
 
   if (shouldShowFailure) {
     return (
-      <FailureState
+      <AnalysisFailureCard
         errorMessage={jobQuery.data?.error}
+        stage={jobQuery.data?.stage}
         onRetry={() => {
           if (selectedPersonaId && contentId) {
             retryMutation.mutate();

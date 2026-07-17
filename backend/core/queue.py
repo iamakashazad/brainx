@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import datetime as dt
 import logging
 import shutil
 from pathlib import Path
@@ -149,6 +150,61 @@ async def mark_interrupted_jobs() -> int:
         return len(jobs)
 
 
+def should_mark_stale_active(job: Job, now: dt.datetime) -> bool:
+    # Only PENDING jobs go stale: a pending job past the timeout means the
+    # worker never picked it up. RUNNING jobs are owned by the worker's own
+    # asyncio.wait_for timeout — long CPU inference must not be killed here.
+    if job.status != "PENDING":
+        return False
+
+    last_progress = job.updated_at or job.created_at
+    if last_progress is None:
+        return False
+
+    stale_after = settings.job_timeout_seconds + 30
+    return (now - last_progress).total_seconds() > stale_after
+
+
+def mark_stale_active_job(job: Job) -> None:
+    job.status = "ERROR"
+    job.queue_position = None
+    job.error_message = (
+        f"Analysis timed out after no progress for {settings.job_timeout_seconds} seconds. "
+        "The worker may have stopped or the content may be too large."
+    )
+
+
+async def mark_stale_active_jobs() -> int:
+    """Flip abandoned stale jobs to ERROR even when nobody is polling them."""
+    now = dt.datetime.utcnow()
+    async with database.async_session() as session:
+        result = await session.execute(select(Job).where(Job.status == "PENDING"))
+        jobs = result.scalars().all()
+
+        flipped = 0
+        for job in jobs:
+            if should_mark_stale_active(job, now):
+                mark_stale_active_job(job)
+                flipped += 1
+
+        if flipped:
+            await session.commit()
+        return flipped
+
+
+async def stale_job_sweeper(interval_seconds: int = 60) -> None:
+    while True:
+        try:
+            flipped = await mark_stale_active_jobs()
+            if flipped:
+                logger.warning("stale job sweeper marked %d abandoned job(s) as ERROR", flipped)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("stale job sweeper iteration failed")
+        await asyncio.sleep(interval_seconds)
+
+
 async def transition(session: AsyncSession, job: Job, stage: StageEnum | None) -> None:
     job.stage = stage.value if stage is not None else None
     logger.info("job %s -> %s", job.id, job.stage)
@@ -245,33 +301,31 @@ async def gpu_worker_loop() -> None:
             gpu_queue.task_done()
 
 
-async def _mark_failed(job_id: str, exc: BaseException) -> None:
-    try:
-        async with database.async_session() as session:
-            job = (await session.execute(select(Job).where(Job.id == job_id))).scalar_one_or_none()
-            if job is None:
-                return
-            job.status = "ERROR"
-            job.queue_position = None
-            job.error_message = f"Analysis failed: {exc}"
-            await session.commit()
-    except Exception:
-        logger.exception("could not mark job %s as ERROR", job_id)
-
-
-async def _mark_timed_out(job_id: str, timeout_seconds: int) -> None:
+async def _fail_job(job_id: str, message: str) -> None:
+    """Mark a job ERROR while preserving job.stage so failures stay diagnosable."""
     async with database.async_session() as session:
         job = (await session.execute(select(Job).where(Job.id == job_id))).scalar_one_or_none()
         if job is None:
             return
         job.status = "ERROR"
-        job.stage = None
         job.queue_position = None
-        job.error_message = (
-            f"Analysis timed out after {timeout_seconds} seconds. "
-            "Please try again with shorter content."
-        )
+        job.error_message = message
         await session.commit()
+
+
+async def _mark_failed(job_id: str, exc: BaseException) -> None:
+    try:
+        await _fail_job(job_id, f"Analysis failed: {exc}")
+    except Exception:
+        logger.exception("could not mark job %s as ERROR", job_id)
+
+
+async def _mark_timed_out(job_id: str, timeout_seconds: int) -> None:
+    await _fail_job(
+        job_id,
+        f"Analysis timed out after {timeout_seconds} seconds. "
+        "Please try again with shorter content.",
+    )
 
 
 async def _process_job(job_id: str) -> None:
@@ -313,15 +367,10 @@ async def _process_job(job_id: str) -> None:
             missing_links.append("persona")
         if content is None:
             missing_links.append("content")
-        async with database.async_session() as session:
-            job = (await session.execute(select(Job).where(Job.id == job_id))).scalar_one_or_none()
-            if job is None:
-                return
-            job.status = "ERROR"
-            job.error_message = (
-                f"Analyze job references missing {' and '.join(missing_links)} record(s)"
-            )
-            await transition(session, job, None)
+        await _fail_job(
+            job_id,
+            f"Analyze job references missing {' and '.join(missing_links)} record(s)",
+        )
         return
 
     try:
@@ -345,7 +394,7 @@ async def _process_job(job_id: str) -> None:
         async with database.async_session() as session:
             job = (await session.execute(select(Job).where(Job.id == job_id))).scalar_one()
             await transition(session, job, StageEnum.INFERENCE)
-        cleanup_workspace_whisperx_processes()
+        await asyncio.to_thread(cleanup_workspace_whisperx_processes)
 
         for screen in sim_log.screens:
             _validate_screen_narrative(screen.screen_index, screen.narrative_text)
@@ -378,7 +427,8 @@ async def _process_job(job_id: str) -> None:
                 )
 
             slideshow_path = job_act_dir / "fallback_slideshow.mp4"
-            slideshow_artifact = create_slideshow(
+            slideshow_artifact = await asyncio.to_thread(
+                create_slideshow,
                 image_paths=image_paths,
                 durations=durations,
                 output_path=slideshow_path.as_posix(),
@@ -391,7 +441,8 @@ async def _process_job(job_id: str) -> None:
                 durations=durations,
                 screen_count=len(sim_log.screens),
             )
-            activations_manifest = _save_per_screen_activations(
+            activations_manifest = await asyncio.to_thread(
+                _save_per_screen_activations,
                 job_act_dir=job_act_dir,
                 screen_indices=screen_indices,
                 per_screen_arrays=per_screen_arrays,
@@ -413,7 +464,8 @@ async def _process_job(job_id: str) -> None:
                 if _is_cancelled(job_id) or not await _job_exists(job_id):
                     return
                 per_screen_arrays.append(arr)
-            activations_manifest = _save_per_screen_activations(
+            activations_manifest = await asyncio.to_thread(
+                _save_per_screen_activations,
                 job_act_dir=job_act_dir,
                 screen_indices=screen_indices,
                 per_screen_arrays=per_screen_arrays,
@@ -428,11 +480,16 @@ async def _process_job(job_id: str) -> None:
                 "A1 probe: first-screen activation shape=%s (expected (T, 20484))",
                 per_screen_arrays[0].shape,
             )
-        atlas = get_surf_atlas()
-        roi_per_screen_native: list[dict[str, object]] = []
-        for screen, arr in zip(sim_log.screens, per_screen_arrays):
-            bundle = aggregate_screen_roi(arr, atlas)
-            roi_per_screen_native.append({"screen_index": screen.screen_index, **bundle})
+        def _compute_roi_native() -> list[dict[str, object]]:
+            # Atlas fetch (possible network download) + numpy aggregation are
+            # synchronous — keep them off the event loop.
+            atlas = get_surf_atlas()
+            return [
+                {"screen_index": screen.screen_index, **aggregate_screen_roi(arr, atlas)}
+                for screen, arr in zip(sim_log.screens, per_screen_arrays)
+            ]
+
+        roi_per_screen_native = await asyncio.to_thread(_compute_roi_native)
 
         async with database.async_session() as session:
             job = (await session.execute(select(Job).where(Job.id == job_id))).scalar_one()
@@ -485,48 +542,22 @@ async def _process_job(job_id: str) -> None:
             await transition(session, job, None)
         return
     except HallucinationError as exc:
-        async with database.async_session() as session:
-            job = (await session.execute(select(Job).where(Job.id == job_id))).scalar_one_or_none()
-            if job is None:
-                return
-            job.status = "ERROR"
-            job.error_message = str(exc)
-            await transition(session, job, None)
+        await _fail_job(job_id, str(exc))
         return
     except SchemaValidationFailure as exc:
-        async with database.async_session() as session:
-            job = (await session.execute(select(Job).where(Job.id == job_id))).scalar_one_or_none()
-            if job is None:
-                return
-            job.status = "ERROR"
-            job.error_message = f"Simulation schema validation failed: {exc}"
-            await transition(session, job, None)
+        await _fail_job(job_id, f"Simulation schema validation failed: {exc}")
+        return
+    except DeepSeekClientError as exc:
+        logger.error("job %s failed calling a provider: %s", job_id, exc)
+        await _fail_job(job_id, str(exc))
         return
     except Exception as exc:
         logger.error("job %s failed unexpectedly", job_id, exc_info=exc)
-        async with database.async_session() as session:
-            job = (await session.execute(select(Job).where(Job.id == job_id))).scalar_one_or_none()
-            if job is None:
-                return
-            job.status = "ERROR"
-            message = str(exc)
-            if "fsaverage5" in message or "vertex count" in message:
-                message = f"A1 vertex-count invariant violated: {message}"
-            job.error_message = message
-            await transition(session, job, None)
+        message = str(exc)
+        if "fsaverage5" in message or "vertex count" in message:
+            message = f"A1 vertex-count invariant violated: {message}"
+        await _fail_job(job_id, message)
         return
-
-
-async def _run_inference_with_retry(text_content: str) -> np.ndarray:
-    last_error = "unknown error"
-    for attempt in range(2):
-        try:
-            return await run_tribev2_text(text_content)
-        except Exception as exc:
-            last_error = str(exc)
-            if attempt == 0:
-                continue
-            raise RuntimeError(f"Inference failed after 2 attempts: {last_error}") from exc
 
 
 async def _run_screen_inference_with_retry(screen_index: int, narrative: str) -> np.ndarray:
@@ -572,7 +603,7 @@ async def _run_inference_only(job_id: str, input_type: str, input_payload: str) 
 
             Path("activations").mkdir(exist_ok=True)
             output_path = Path("activations") / f"{job_id}.npy"
-            np.save(output_path, activation)
+            await asyncio.to_thread(np.save, output_path, activation)
 
             async with database.async_session() as session:
                 result = await session.execute(select(Job).where(Job.id == job_id))

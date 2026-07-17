@@ -50,6 +50,7 @@ class ModelStatusResponse(BaseModel):
     loaded: bool
     device: str
     status: str
+    missing_keys: list[str] = []
 
 
 class PersonaCreate(BaseModel):

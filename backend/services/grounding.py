@@ -64,9 +64,14 @@ async def judge(content: Content, sim_log: SimulationLog) -> GroundingVerdict:
             verdict = GroundingVerdict.model_validate_json(raw)
         else:
             verdict = GroundingVerdict.model_validate(raw)
-    except (ValidationError, DeepSeekClientError, OSError) as exc:
-        logger.error("Grounding judge failed", exc_info=exc)
-        raise HallucinationError([]) from exc
+    except ValidationError as exc:
+        logger.error("Grounding judge returned an invalid verdict", exc_info=exc)
+        raise RuntimeError(f"Grounding judge returned an invalid verdict: {exc}") from exc
+    except OSError as exc:
+        logger.error("Grounding judge could not read uploaded images", exc_info=exc)
+        raise RuntimeError(f"Grounding judge could not read uploaded images: {exc}") from exc
+    # DeepSeekClientError propagates untouched — an unreachable provider is not
+    # a content hallucination and must not be reported as one.
 
     if verdict.hallucinations:
         raise HallucinationError(verdict.hallucinations)

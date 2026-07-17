@@ -14,7 +14,19 @@ from backend.models.simulation import DeepSeekClientError
 logger = logging.getLogger(__name__)
 
 REPLICATE_BASE = "https://api.replicate.com"
-SANITIZED_ERROR = "Simulation service temporarily unavailable. Please retry."
+MISSING_TOKEN_ERROR = (
+    "REPLICATE_API_TOKEN is not configured. Set it in .env and restart the backend."
+)
+
+
+def _http_error_message(exc: Exception) -> str:
+    if isinstance(exc, httpx.HTTPStatusError):
+        return f"Replicate request failed (HTTP {exc.response.status_code}). Please retry."
+    if isinstance(exc, httpx.TimeoutException):
+        return "Replicate request timed out. Please retry."
+    if isinstance(exc, httpx.HTTPError):
+        return "Could not reach Replicate (network error). Please retry."
+    return f"Vision analysis failed: {exc}"
 
 
 class ReplicateVL2Backend:
@@ -27,7 +39,7 @@ class ReplicateVL2Backend:
         temperature: float = 0.6,
     ) -> dict | str:
         if not settings.replicate_api_token:
-            raise DeepSeekClientError(SANITIZED_ERROR)
+            raise DeepSeekClientError(MISSING_TOKEN_ERROR)
 
         full_prompt = prompt
         if schema_hint is not None:
@@ -37,12 +49,13 @@ class ReplicateVL2Backend:
             )
 
         try:
-            encoded_images = [
-                "data:image/jpeg;base64," + base64.b64encode(path.read_bytes()).decode("utf-8")
-                for path in images
-            ]
+            encoded_images = await asyncio.to_thread(
+                lambda: [
+                    "data:image/jpeg;base64," + base64.b64encode(path.read_bytes()).decode("utf-8")
+                    for path in images
+                ]
+            )
             payload = {
-                "version": settings.vision_model,
                 "input": {
                     "image": encoded_images[0] if encoded_images else None,
                     "images": encoded_images,
@@ -51,9 +64,12 @@ class ReplicateVL2Backend:
                     "temperature": temperature,
                 },
             }
+            # The model-scoped endpoint accepts an owner/name slug and runs the
+            # latest version; the bare /v1/predictions endpoint requires a
+            # version hash and rejects slugs.
             async with httpx.AsyncClient(timeout=120.0) as client:
                 response = await client.post(
-                    f"{REPLICATE_BASE}/v1/predictions",
+                    f"{REPLICATE_BASE}/v1/models/{settings.vision_model}/predictions",
                     headers={"Authorization": f"Bearer {settings.replicate_api_token}"},
                     json=payload,
                 )
@@ -62,7 +78,7 @@ class ReplicateVL2Backend:
                 output = await self._resolve_output(client, data)
         except (httpx.HTTPError, OSError, ValueError, KeyError) as exc:
             logger.error("Replicate request failed", exc_info=exc)
-            raise DeepSeekClientError(SANITIZED_ERROR) from exc
+            raise DeepSeekClientError(_http_error_message(exc)) from exc
 
         if isinstance(output, dict):
             return output
@@ -83,7 +99,8 @@ class ReplicateVL2Backend:
             status = status_payload.get("status")
             if status in {"succeeded", "failed", "canceled"}:
                 if status != "succeeded":
-                    raise DeepSeekClientError(SANITIZED_ERROR)
+                    detail = status_payload.get("error") or status
+                    raise DeepSeekClientError(f"Replicate prediction {status}: {detail}")
                 return status_payload["output"]
             await asyncio.sleep(2)
-        raise DeepSeekClientError(SANITIZED_ERROR)
+        raise DeepSeekClientError("Replicate prediction timed out after ~120s of polling.")

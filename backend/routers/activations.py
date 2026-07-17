@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 
 import numpy as np
@@ -41,7 +42,7 @@ async def get_screen_activation(job_id: str, screen_index: int) -> Response:
             detail=f"Activation file missing on disk: {manifest_entry.path}",
         )
 
-    activation = np.load(activation_path, allow_pickle=False)
+    activation = await asyncio.to_thread(np.load, activation_path, allow_pickle=False)
     if activation.ndim != 2 or activation.shape[1] != VERTEX_COUNT:
         raise HTTPException(
             status_code=500,

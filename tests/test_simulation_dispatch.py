@@ -60,7 +60,7 @@ async def test_vl2_dispatch(tmp_path, monkeypatch):
         deepseek_route = router.post("https://api.deepseek.com/chat/completions").mock(
             return_value=httpx.Response(200, json={})
         )
-        replicate_route = router.post("https://api.replicate.com/v1/predictions").mock(
+        replicate_route = router.post("https://api.replicate.com/v1/models/deepseek-ai/deepseek-vl2/predictions").mock(
             return_value=httpx.Response(200, json={"output": [valid_json]})
         )
 
@@ -101,7 +101,7 @@ async def test_v3_dispatch(monkeypatch):
         deepseek_route = router.post("https://api.deepseek.com/chat/completions").mock(
             return_value=httpx.Response(200, json={"choices": [{"message": {"content": valid_json}}]})
         )
-        replicate_route = router.post("https://api.replicate.com/v1/predictions").mock(
+        replicate_route = router.post("https://api.replicate.com/v1/models/deepseek-ai/deepseek-vl2/predictions").mock(
             return_value=httpx.Response(200, json={})
         )
 

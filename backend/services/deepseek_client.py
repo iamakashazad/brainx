@@ -12,7 +12,17 @@ from backend.models.simulation import DeepSeekClientError, SchemaValidationFailu
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T", bound=BaseModel)
-SANITIZED_ERROR = "Simulation service temporarily unavailable. Please retry."
+MISSING_KEY_ERROR = (
+    "DEEPSEEK_API_KEY is not configured. Set it in .env and restart the backend."
+)
+
+
+def _http_error_message(exc: httpx.HTTPError) -> str:
+    if isinstance(exc, httpx.HTTPStatusError):
+        return f"DeepSeek request failed (HTTP {exc.response.status_code}). Please retry."
+    if isinstance(exc, httpx.TimeoutException):
+        return "DeepSeek request timed out. Please retry."
+    return "Could not reach DeepSeek (network error). Please retry."
 
 
 async def deepseek_text_completion(
@@ -23,13 +33,14 @@ async def deepseek_text_completion(
     max_tokens: int = 4000,
     temperature: float = 0.6,
 ) -> T:
+    if not settings.deepseek_api_key:
+        raise DeepSeekClientError(MISSING_KEY_ERROR)
+
     model = model or settings.deepseek_text_model
     current_user = user
 
     for attempt in (1, 2):
         try:
-            if not settings.deepseek_api_key:
-                raise DeepSeekClientError(SANITIZED_ERROR)
             async with httpx.AsyncClient(timeout=60.0) as client:
                 response = await client.post(
                     f"{settings.deepseek_base_url}/chat/completions",
@@ -48,7 +59,7 @@ async def deepseek_text_completion(
                 response.raise_for_status()
         except httpx.HTTPError as exc:
             logger.error("DeepSeek request failed", exc_info=exc)
-            raise DeepSeekClientError(SANITIZED_ERROR) from exc
+            raise DeepSeekClientError(_http_error_message(exc)) from exc
 
         raw = response.json()["choices"][0]["message"]["content"] or ""
         try:

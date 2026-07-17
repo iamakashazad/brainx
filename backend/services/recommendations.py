@@ -15,7 +15,7 @@ from pydantic import BaseModel
 
 from backend.models.recommendations import Recommendations, rank_score
 from backend.models.simulation import DeepSeekClientError, SchemaValidationFailure, SimulationLog
-from backend.services.deepseek_client import SANITIZED_ERROR, deepseek_text_completion
+from backend.services.deepseek_client import deepseek_text_completion
 from backend.services.roi_aggregation import ROI_CIRCUIT_MAP
 
 LAYOUT_FLAG_COGNITIVE_LOAD_MIN = 70.0
@@ -528,7 +528,11 @@ async def generate_recommendations(
                     continue
                 raise
             return recommendations
-    except (DeepSeekClientError, SchemaValidationFailure, ValueError) as exc:
-        raise DeepSeekClientError(SANITIZED_ERROR) from exc
+    except ValueError as exc:
+        # DeepSeekClientError / SchemaValidationFailure propagate untouched so
+        # the real provider failure reaches the job record and the user.
+        raise RuntimeError(
+            f"Recommendations failed behavioral validation after retry: {exc}"
+        ) from exc
 
-    raise DeepSeekClientError(SANITIZED_ERROR)
+    raise RuntimeError("Recommendations generation exhausted retries without a result.")

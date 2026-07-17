@@ -11,8 +11,8 @@ BrainX is built in strict pipeline order: the backend foundation and TRIBEv2 int
 - [x] **Phase 3: Full Pipeline Integration and Recommendations** - End-to-end pipeline from content + persona to brain maps and grounded copy recommendations
 - [x] **Phase 3.1: Runtime Fallback Wiring and Pathway Closure** - Wire the slideshow/video fallback into the shared analyze flow and prove SIM-03 in the shipped runtime path (completed 2026-04-18)
 - [x] **Phase 3.2: Verification and Traceability Reconciliation** - Create the missing Phase 2 verification, refresh stale audit artifacts, and reconcile requirement traceability before re-audit (completed 2026-04-19; gap closure 03.2-04/05 added 2026-04-20)
-- [ ] **Phase 4: Frontend — Upload, Persona, and Results** - Complete React frontend with 3D brain visualization, persona form, upload flow, and results view
-- [ ] **Phase 5: Session Persistence, Demo, and Polish** - Session history, re-loadable results, pre-built demo case study, and production hardening
+- [x] **Phase 4: Frontend — Upload, Persona, and Results** - Complete React frontend with 3D brain visualization, persona form, upload flow, and results view (built; UAT tests 1, 11, 13-16 pending a green cold-start E2E run)
+- [x] **Phase 5: Session Persistence, Demo, and Polish** - Session history, re-loadable results, pre-built demo case study, and production hardening (built; 4 human browser UAT checks pending — see 05-HUMAN-UAT.md)
 
 ## Phase Details
 
@@ -88,7 +88,7 @@ Plans:
 Plans:
 - [x] 04-01: Upload flow plus persona form and multipart submit path
 - [x] 04-02: Processing view with polling and stage progress indicators
-- [ ] 04-03: Results view with overlays, 3D brain visualization, metric scores, and recommendations panel
+- [x] 04-03: Results view with overlays, 3D brain visualization, metric scores, and recommendations panel
 
 ### Phase 5: Session Persistence, Demo, and Polish
 **Goal**: Past sessions are browsable and reloadable without rerunning inference; a pre-built demo loads quickly; production hardening closes silent-failure and queue-overflow scenarios
@@ -110,5 +110,5 @@ Plans:
 | 3. Full Pipeline Integration and Recommendations | 5/5 | Complete | 2026-04-18 |
 | 3.1. Runtime Fallback Wiring and Pathway Closure | 2/2 | Complete    | 2026-04-18 |
 | 3.2. Verification and Traceability Reconciliation | 5/5 | Complete | 2026-04-20 |
-| 4. Frontend — Upload, Persona, and Results | 2/3 | In progress | - |
-| 5. Session Persistence, Demo, and Polish | 0/3 | Not started | - |
+| 4. Frontend — Upload, Persona, and Results | 3/3 | Built — UAT partial (tests 1, 11, 13-16 open) | - |
+| 5. Session Persistence, Demo, and Polish | 3/3 | Built — 4 human UAT checks pending | - |

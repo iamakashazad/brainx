@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.core.config import settings
+from backend.core.config import missing_required_keys, settings
 from backend.core.database import init_db
 from backend.core import queue as queue_manager
 from backend.ml.tribe_loader import load_model
@@ -15,9 +16,19 @@ from backend.services.inference import recycle_gpu_executor
 from backend.services.process_guard import cleanup_workspace_whisperx_processes
 
 
+logger = logging.getLogger(__name__)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
+    missing_keys = missing_required_keys()
+    if missing_keys:
+        logger.error(
+            "Missing required API keys: %s — analysis submissions will be rejected "
+            "until they are set in .env and the backend is restarted",
+            ", ".join(missing_keys),
+        )
     cleanup_workspace_whisperx_processes()
     interrupted_count = await queue_manager.mark_interrupted_jobs()
     if interrupted_count:
@@ -30,13 +41,16 @@ async def lifespan(app: FastAPI):
 
     worker_task = asyncio.create_task(queue_manager.supervised_worker_loop())
     app.state.worker_task = worker_task
+    sweeper_task = asyncio.create_task(queue_manager.stale_job_sweeper())
+    app.state.sweeper_task = sweeper_task
 
     try:
         yield
     finally:
-        worker_task.cancel()
-        with suppress(asyncio.CancelledError):
-            await worker_task
+        for task in (worker_task, sweeper_task):
+            task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
         # Recycle rather than shutdown: leaves a fresh usable executor so
         # repeated app lifecycles (tests, dev reload) don't inherit a dead one.
         recycle_gpu_executor()

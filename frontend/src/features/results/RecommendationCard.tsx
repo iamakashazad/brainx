@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { motion } from "framer-motion";
 import { useWizardStore } from "@/stores/wizardStore";
 import { cycleToSecondary, groupRecsByScreen, type RecWithId } from "./recommendationsByScreen";
@@ -10,7 +11,7 @@ function formatRecType(recType: RecWithId["rec_type"]) {
     .join(" ");
 }
 
-const RANK_STYLE: Record<RecWithId["evidence"]["score_rank"], React.CSSProperties> = {
+const RANK_STYLE: Record<RecWithId["evidence"]["score_rank"], CSSProperties> = {
   "Very High": { background: "var(--color-brand-light)", color: "var(--color-brand-deep)" },
   "High":      { background: "var(--color-blue-bg)",    color: "var(--color-blue)" },
   "Moderate":  { background: "var(--color-amber-bg)",   color: "var(--color-amber)" },

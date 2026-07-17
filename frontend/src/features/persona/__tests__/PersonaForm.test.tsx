@@ -104,7 +104,7 @@ describe("PersonaForm", () => {
     await user.click(screen.getByRole("button", { name: /Next/i }));
 
     await waitFor(() => {
-      expect(screen.getByLabelText("Goals")).toBeInTheDocument();
+      expect(screen.getByRole("textbox", { name: "Goals" })).toBeInTheDocument();
     });
   });
 
@@ -120,24 +120,24 @@ describe("PersonaForm", () => {
     await user.click(screen.getByRole("button", { name: /Next/i }));
 
     // Step 1: Psychographics
-    await waitFor(() => expect(screen.getByLabelText("Goals")).toBeInTheDocument());
-    await user.type(screen.getByLabelText("Goals"), "ship faster");
-    await user.type(screen.getByLabelText("Values"), "clarity");
-    await user.type(screen.getByLabelText("Motivations"), "reduce friction");
+    await waitFor(() => expect(screen.getByRole("textbox", { name: "Goals" })).toBeInTheDocument());
+    await user.type(screen.getByRole("textbox", { name: "Goals" }), "ship faster");
+    await user.type(screen.getByRole("textbox", { name: "Values" }), "clarity");
+    await user.type(screen.getByRole("textbox", { name: "Motivations" }), "reduce friction");
     await user.click(screen.getByRole("button", { name: /Next/i }));
 
     // Step 2: Cognitive State
-    await waitFor(() => expect(screen.getByLabelText("Attention Span")).toBeInTheDocument());
-    await user.selectOptions(screen.getByLabelText("Attention Span"), "medium");
-    await user.selectOptions(screen.getByLabelText("Stress Level"), "moderate");
-    await user.selectOptions(screen.getByLabelText("Tech Literacy"), "expert");
+    await waitFor(() => expect(screen.getByRole("combobox", { name: "Attention Span" })).toBeInTheDocument());
+    await user.selectOptions(screen.getByRole("combobox", { name: "Attention Span" }), "medium");
+    await user.selectOptions(screen.getByRole("combobox", { name: "Stress Level" }), "moderate");
+    await user.selectOptions(screen.getByRole("combobox", { name: "Tech Literacy" }), "expert");
     await user.click(screen.getByRole("button", { name: /Next/i }));
 
     // Step 3: Environment
-    await waitFor(() => expect(screen.getByLabelText("Device")).toBeInTheDocument());
-    await user.selectOptions(screen.getByLabelText("Device"), "desktop");
-    await user.selectOptions(screen.getByLabelText("Location"), "office");
-    await user.type(screen.getByLabelText("Ambient"), "quiet");
+    await waitFor(() => expect(screen.getByRole("combobox", { name: "Device" })).toBeInTheDocument());
+    await user.selectOptions(screen.getByRole("combobox", { name: "Device" }), "desktop");
+    await user.selectOptions(screen.getByRole("combobox", { name: "Location" }), "office");
+    await user.type(screen.getByRole("textbox", { name: "Ambient" }), "quiet");
 
     await user.click(screen.getByRole("button", { name: "Save Persona" }));
 

@@ -40,6 +40,11 @@ function buildJobResponse(overrides: Partial<JobStatusResponse> = {}): JobStatus
     result: null,
     error: null,
     created_at: "2026-04-24T12:00:00.000Z",
+    updated_at: null,
+    runtime_seconds: null,
+    inference_processes: 0,
+    stale_inference_processes: 0,
+    status_message: null,
     ...overrides,
   };
 }

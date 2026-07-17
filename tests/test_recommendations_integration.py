@@ -525,7 +525,7 @@ class TestGenerateRecommendationsRepairRetry:
         assert len(result.recommendations) == 1
         assert route.call_count == 2
 
-    async def test_second_malformed_raises_sanitized(
+    async def test_second_malformed_raises_schema_failure(
         self,
         respx_mock,
         sim_log_3_screens,
@@ -533,7 +533,7 @@ class TestGenerateRecommendationsRepairRetry:
         monkeypatch: pytest.MonkeyPatch,
     ):
         from backend.core.config import settings
-        from backend.models.simulation import DeepSeekClientError
+        from backend.models.simulation import SchemaValidationFailure
         from backend.services.recommendations import generate_recommendations
 
         monkeypatch.setattr(settings, "deepseek_api_key", "deepseek-test")
@@ -546,7 +546,7 @@ class TestGenerateRecommendationsRepairRetry:
             ]
         )
 
-        with pytest.raises(DeepSeekClientError):
+        with pytest.raises(SchemaValidationFailure):
             await generate_recommendations(
                 persona_model_fixture,
                 sim_log_3_screens,
@@ -556,15 +556,17 @@ class TestGenerateRecommendationsRepairRetry:
 
 
 class TestGenerateRecommendationsErrorSanitization:
-    async def test_invalid_activation_score_raises_sanitized(
+    async def test_invalid_activation_score_is_clamped_to_roi(
         self,
         sim_log_3_screens,
         persona_model_fixture: PersonaRead,
         monkeypatch: pytest.MonkeyPatch,
     ):
         from backend.models.recommendations import Recommendations
-        from backend.models.simulation import DeepSeekClientError
-        from backend.services.recommendations import generate_recommendations
+        from backend.services.recommendations import (
+            _allowed_roi_scores,
+            generate_recommendations,
+        )
 
         invalid_score_bundle = Recommendations.model_validate(
             {
@@ -591,13 +593,15 @@ class TestGenerateRecommendationsErrorSanitization:
 
         monkeypatch.setattr("backend.services.recommendations.deepseek_text_completion", fake_completion)
 
-        with pytest.raises(DeepSeekClientError):
-            await generate_recommendations(
-                persona_model_fixture,
-                sim_log_3_screens,
-                _roi(),
-                _flow(),
-            )
+        result = await generate_recommendations(
+            persona_model_fixture,
+            sim_log_3_screens,
+            _roi(),
+            _flow(),
+        )
+
+        clamped = result.recommendations[0].evidence.activation_score
+        assert clamped in _allowed_roi_scores(_roi())
 
     async def test_api_key_not_in_error(
         self,

@@ -49,7 +49,8 @@ describe("RecommendationCard", () => {
   it("renders the grounding footer and copy rewrite before/after treatment", () => {
     render(<RecommendationCard rec={stableRecs[0]!} allRecs={stableRecs} />);
 
-    expect(screen.getByText("Attention · S_front_inf · 74.3/100 · High")).toBeInTheDocument();
+    expect(screen.getByText("Attention · S_front_inf · 74.3/100")).toBeInTheDocument();
+    expect(screen.getByText("High")).toBeInTheDocument();
     expect(screen.getByText("Buy now")).toHaveClass("line-through");
     expect(screen.getByText("Start your free trial")).toBeInTheDocument();
   });

@@ -223,7 +223,6 @@ async def test_trigger_heavy_bundle_rejects_copy_only_output(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from backend.core.config import settings
-    from backend.models.simulation import DeepSeekClientError
     from backend.services.recommendations import generate_recommendations
 
     monkeypatch.setattr(settings, "deepseek_api_key", "deepseek-test")
@@ -234,7 +233,7 @@ async def test_trigger_heavy_bundle_rejects_copy_only_output(
         )
     )
 
-    with pytest.raises(DeepSeekClientError):
+    with pytest.raises(RuntimeError, match="behavioral validation"):
         await generate_recommendations(
             persona_model_fixture,
             _trigger_heavy_sim_log(),

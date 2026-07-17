@@ -6,13 +6,35 @@ from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 
 from backend.core import database, queue as queue_manager
-from backend.models.content import Content
+from backend.core.config import settings
+from backend.models.content import Content, ContentType
 from backend.models.job import Job
 from backend.models.persona import Persona
 from backend.models.schemas import AnalyzeRequest, AnalyzeResponse
 
 router = APIRouter()
 QUEUE_DEPTH_LIMIT = queue_manager.QUEUE_DEPTH_LIMIT
+
+
+def _require_provider_keys(content_type: str) -> None:
+    """Reject at submit time instead of letting the job fail mid-pipeline."""
+    if not settings.deepseek_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "DEEPSEEK_API_KEY is not configured on the server. "
+                "Add it to .env and restart the backend."
+            ),
+        )
+    needs_vision = content_type != ContentType.TEXT.value
+    if needs_vision and settings.vision_provider == "replicate" and not settings.replicate_api_token:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "REPLICATE_API_TOKEN is not configured on the server. "
+                "Add it to .env and restart the backend, or submit text content instead."
+            ),
+        )
 
 
 @router.post("", response_model=AnalyzeResponse, status_code=status.HTTP_201_CREATED)
@@ -29,6 +51,8 @@ async def submit_analyze(payload: AnalyzeRequest) -> AnalyzeResponse:
         ).scalar_one_or_none()
         if content is None:
             raise HTTPException(status_code=404, detail=f"Content {payload.content_id} not found")
+
+        _require_provider_keys(content.content_type)
 
         async with queue_manager.queue_capacity_lock:
             if queue_manager.gpu_queue.qsize() >= QUEUE_DEPTH_LIMIT:
