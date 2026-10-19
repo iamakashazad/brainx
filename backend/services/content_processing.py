@@ -9,7 +9,10 @@ ALLOWED_MIMES = frozenset({"image/png", "image/jpeg", "image/webp"})
 MAX_INPUT_BYTES = 5 * 1024 * 1024
 LONGEST_EDGE = 1024
 JPEG_QUALITY = 85
-MAX_DECODED_PIXELS = 1_073_741_824
+# ~50 MP covers any real screenshot (8K is 33 MP). The previous 1 GP value only
+# made Pillow *warn*; it raises at twice the limit, so a tiny 1-bit 40k x 40k PNG
+# under the 5MB cap was decoded and convert("RGB") allocated ~4.8GB.
+MAX_DECODED_PIXELS = 50_000_000
 
 Image.MAX_IMAGE_PIXELS = MAX_DECODED_PIXELS
 
@@ -35,6 +38,12 @@ def process_upload(raw: bytes, out_path: Path) -> dict:
 
     try:
         with Image.open(BytesIO(raw)) as im:
+            # Image.open is lazy: check dimensions before anything decodes pixels.
+            width, height = im.size
+            if width * height > MAX_DECODED_PIXELS:
+                raise ImageValidationError(
+                    f"image is {width}x{height} ({width * height:,} px) - max {MAX_DECODED_PIXELS:,} px"
+                )
             im = ImageOps.exif_transpose(im)
             im = im.convert("RGB")
             im.thumbnail((LONGEST_EDGE, LONGEST_EDGE), Image.Resampling.LANCZOS)

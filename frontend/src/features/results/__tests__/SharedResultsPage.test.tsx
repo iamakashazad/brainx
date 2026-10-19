@@ -34,10 +34,34 @@ describe("SharedResultsPage", () => {
   it("renders not found copy and history link for missing sessions", async () => {
     server.use(http.get("http://localhost:8000/jobs/missing", () => new HttpResponse(null, { status: 404 })));
     renderShared("/results/missing");
+    expect(await screen.findByRole("heading", { name: "Session not found" })).toBeInTheDocument();
     expect(
-      await screen.findByText("Session not found. This analysis may have been deleted or the link is incorrect."),
+      screen.getByText("This analysis may have been deleted or the link is incorrect."),
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Go to History" })).toHaveAttribute("href", "/");
+  });
+
+  it("says a running job is still running rather than deleted", async () => {
+    server.use(
+      http.get("http://localhost:8000/jobs/live", () =>
+        HttpResponse.json({ job_id: "live", status: "RUNNING", stage: "inference", error: null, persona_id: null, queue_position: null, result: null, created_at: null }),
+      ),
+    );
+    renderShared("/results/live");
+    expect(await screen.findByRole("heading", { name: "Analysis still running" })).toBeInTheDocument();
+  });
+
+  it("shows the real error for a failed job", async () => {
+    server.use(
+      http.get("http://localhost:8000/jobs/failed", () =>
+        HttpResponse.json({
+          job_id: "failed", status: "ERROR", stage: "inference", error: "whisperx died", persona_id: null, queue_position: null, result: null, created_at: null,
+        }),
+      ),
+    );
+    renderShared("/results/failed");
+    expect(await screen.findByRole("heading", { name: "Analysis failed" })).toBeInTheDocument();
+    expect(screen.getByText("whisperx died")).toBeInTheDocument();
   });
 
   it("does not render wizard chrome", async () => {

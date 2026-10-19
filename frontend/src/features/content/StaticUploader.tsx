@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { UploadDropZone } from "./UploadDropZone";
-import { useUploadStaticMutation } from "./useUploadContent";
+import { discardContent, useUploadStaticMutation } from "./useUploadContent";
 
 type StaticPreview = {
   file: File;
@@ -20,11 +20,23 @@ export function StaticUploader() {
   const [preview, setPreview] = useState<StaticPreview | null>(null);
   const mutation = useUploadStaticMutation();
 
+  // Radix unmounts this panel on every tab switch; revoke the blob URL then too.
+  const previewRef = useRef(preview);
+  previewRef.current = preview;
+  useEffect(() => {
+    return () => {
+      if (previewRef.current?.revoke) {
+        URL.revokeObjectURL(previewRef.current.previewUrl);
+      }
+    };
+  }, []);
+
   return (
     <div className="space-y-4">
       <UploadDropZone
         label="Drop a single image here, or click to browse"
         accept="image/*"
+        disabled={mutation.isPending}
         onFiles={(files) => {
           const nextPreview = createPreview(files[0]!);
           if (preview?.revoke) {
@@ -34,6 +46,19 @@ export function StaticUploader() {
           mutation.mutate(files[0]!);
         }}
       />
+
+      {mutation.isPending ? (
+        <p className="text-sm text-muted-foreground">Uploading image…</p>
+      ) : null}
+
+      {/* Without this the server's rejection (too large, unsupported type,
+          undecodable) was silent: the preview below still rendered, so the
+          upload looked successful while "Run Analysis" stayed disabled. */}
+      {mutation.isError ? (
+        <p role="alert" className="text-sm text-destructive">
+          {`Upload failed: ${mutation.error.message}`}
+        </p>
+      ) : null}
 
       {preview ? (
         <div className="space-y-3 rounded-2xl border border-border bg-card p-3">
@@ -50,6 +75,9 @@ export function StaticUploader() {
                 URL.revokeObjectURL(preview.previewUrl);
               }
               setPreview(null);
+              // Clearing only local preview state used to leave contentId set,
+              // so "Run Analysis" stayed enabled and submitted the removed image.
+              discardContent();
             }}
           >
             Remove image

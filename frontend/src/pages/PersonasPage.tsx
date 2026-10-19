@@ -24,10 +24,14 @@ function PersonaCard({
   persona,
   onDelete,
   onAnalyze,
+  deleteError,
+  deletePending = false,
 }: {
   persona: PersonaRead;
   onDelete: () => void;
   onAnalyze: () => void;
+  deleteError?: string | null;
+  deletePending?: boolean;
 }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [hovered, setHovered] = useState(false);
@@ -41,6 +45,13 @@ function PersonaCard({
       transition={{ duration: 0.2, ease: "easeOut" }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      // Keyboard users never hover; reveal "Analyze" while focus is inside.
+      onFocus={() => setHovered(true)}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          setHovered(false);
+        }
+      }}
       style={{
         background: "var(--card)",
         border: `1px solid ${hovered ? "var(--border-medium)" : "var(--border)"}`,
@@ -109,18 +120,33 @@ function PersonaCard({
               <p className="mt-1" style={{ color: "var(--muted-foreground)" }}>
                 This cannot be undone.
               </p>
+              {/* A persona already used by an analysis cannot be deleted: the
+                  backend answers 409. That detail was previously discarded, so
+                  the panel just closed and nothing happened. */}
+              {deleteError && (
+                <p
+                  role="alert"
+                  className="mt-2 font-medium"
+                  style={{ color: "var(--color-error)" }}
+                >
+                  {deleteError}
+                </p>
+              )}
               <div className="mt-3 flex gap-2">
                 <button
                   type="button"
+                  disabled={deletePending}
                   className="inline-flex items-center rounded-full px-4 py-1.5 text-sm font-medium transition"
                   style={{
                     background: "var(--color-error)",
                     color: "#fff",
                     borderRadius: "var(--radius-full)",
+                    opacity: deletePending ? 0.6 : 1,
+                    cursor: deletePending ? "not-allowed" : "pointer",
                   }}
                   onClick={onDelete}
                 >
-                  Delete
+                  {deletePending ? "Deleting…" : "Delete"}
                 </button>
                 <button
                   type="button"
@@ -224,6 +250,9 @@ export function PersonasPage() {
   const [showForm, setShowForm] = useState(false);
   const { data: personas, isLoading } = usePersonasQuery();
   const deleteMutation = useDeletePersonaMutation();
+  // One shared mutation serves every card, so remember which persona the
+  // pending state and any error belong to.
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const setPersona = useWizardStore((state) => state.setPersona);
   const reset = useWizardStore((state) => state.reset);
 
@@ -309,9 +338,25 @@ export function PersonasPage() {
                   key={persona.id}
                   persona={persona}
                   onDelete={() => {
-                    deleteMutation.mutate(persona.id);
+                    setDeleteTargetId(persona.id);
+                    deleteMutation.mutate(persona.id, {
+                      onSuccess: () => {
+                        // Deleting the persona the wizard still points at would
+                        // otherwise leave a dangling selection in the store.
+                        // Read at success time, not from the render closure.
+                        if (useWizardStore.getState().selectedPersonaId === persona.id) {
+                          setPersona(null);
+                        }
+                      },
+                    });
                   }}
                   onAnalyze={() => handleAnalyze(persona.id)}
+                  deleteError={
+                    deleteTargetId === persona.id && deleteMutation.isError
+                      ? deleteMutation.error.message
+                      : null
+                  }
+                  deletePending={deleteTargetId === persona.id && deleteMutation.isPending}
                 />
               ))}
             </AnimatePresence>

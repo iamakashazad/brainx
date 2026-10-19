@@ -14,7 +14,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from backend.models.recommendations import Recommendations, rank_score
-from backend.models.simulation import DeepSeekClientError, SchemaValidationFailure, SimulationLog
+from backend.models.simulation import SimulationLog
 from backend.services.deepseek_client import deepseek_text_completion
 from backend.services.roi_aggregation import ROI_CIRCUIT_MAP
 
@@ -306,11 +306,6 @@ def _normalize_evidence_regions(
             rec.evidence.region = fallback_region
 
 
-def _normalize_evidence_score_ranks(recommendations: Recommendations) -> None:
-    for rec in recommendations.recommendations:
-        rec.evidence.score_rank = rank_score(rec.evidence.activation_score)
-
-
 def _clamp_score_to_roi(score: float, allowed_scores: set[float]) -> float:
     """Return the nearest allowed ROI score, clamping hallucinated values."""
     if not allowed_scores:
@@ -321,13 +316,46 @@ def _clamp_score_to_roi(score: float, allowed_scores: set[float]) -> float:
     return min(allowed_scores, key=lambda s: abs(s - cited))
 
 
+def _allowed_scores_for_evidence(
+    screen_bundle: dict[str, Any],
+    circuit_name: str,
+    region: str,
+) -> set[float]:
+    """Scores the cited (screen, circuit, region) actually has in the ROI bundle."""
+    scoped: set[float] = set()
+    circuit = screen_bundle.get("circuits", {}).get(circuit_name)
+    if isinstance(circuit, dict):
+        for key in ("score", "peak"):
+            if key in circuit:
+                scoped.add(round(float(circuit[key]), 1))
+    for row in screen_bundle.get("regions", []):
+        if isinstance(row, dict) and row.get("circuit") == circuit_name and row.get("atlas_label") == region:
+            for key in ("score", "peak"):
+                if key in row:
+                    scoped.add(round(float(row[key]), 1))
+    return scoped
+
+
 def _validate_evidence_against_roi(
     recommendations: Recommendations,
     roi_per_screen: list[dict[str, Any]],
 ) -> None:
-    allowed_scores = _allowed_roi_scores(roi_per_screen)
+    # Snap to the cited screen/circuit/region's own values. Pooling every score
+    # across all screens and circuits let a hallucinated "Cognitive Load 87.0"
+    # snap to an unrelated Reward peak of 86.9 and be shown as grounded evidence.
+    roi_by_screen = _screen_roi_map(roi_per_screen)
+    global_scores: set[float] | None = None
 
     for rec in recommendations.recommendations:
+        allowed_scores = _allowed_scores_for_evidence(
+            roi_by_screen.get(rec.screen_index, {}),
+            rec.evidence.circuit,
+            rec.evidence.region,
+        )
+        if not allowed_scores:
+            if global_scores is None:
+                global_scores = _allowed_roi_scores(roi_per_screen)
+            allowed_scores = global_scores
         clamped = _clamp_score_to_roi(rec.evidence.activation_score, allowed_scores)
         rec.evidence.activation_score = clamped
         rec.evidence.score_rank = rank_score(clamped)
@@ -514,7 +542,6 @@ async def generate_recommendations(
                 result if isinstance(result, Recommendations) else Recommendations.model_validate(result)
             )
             _normalize_evidence_regions(recommendations, _screen_roi_map(roi_per_screen))
-            _normalize_evidence_score_ranks(recommendations)
             _validate_evidence_against_roi(recommendations, roi_per_screen)
             try:
                 validate_behavioral_coverage(

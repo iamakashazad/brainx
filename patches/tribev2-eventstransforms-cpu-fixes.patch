@@ -89,3 +89,69 @@ analysis job even though an immediate retry succeeds.
 Fix in _get_transcript_from_audio: run the whisperx subprocess up to 3 times
 (2s pause between attempts) and include the returncode plus the stderr tail
 in the error message when all attempts fail.
+
+
+=== Change 4 (2026-08-14): Stop HOME=model_cache leaking into uvx ===
+
+ROOT CAUSE of the recurring `whisperx failed (returncode=-15)` failures.
+
+backend/ml/tribe_loader.py::_build_model sets, process-wide:
+
+    os.environ["HOME"] = cache_folder.as_posix()          # -> <repo>/model_cache
+    os.environ.setdefault("XDG_CACHE_HOME", ...)          # -> model_cache/.cache
+
+This keeps torch/HF caches inside the workspace, but the whisperx subprocess
+inherits it, and `uv` resolves its managed interpreters from
+$HOME/.local/share/uv/python. With HOME=model_cache that directory does not
+exist, so uv silently falls back to the Xcode CommandLineTools interpreter:
+
+    $ uv python find                          -> ~/.local/share/uv/python/cpython-3.11.../python3.11
+    $ HOME=model_cache uv python find         -> /Library/Developer/CommandLineTools/usr/bin/python3  (3.9.6)
+
+On 3.9.6 several whisperx dependencies have no usable wheel and must be built
+from sdist. Evidence found in the workspace cache:
+  - model_cache/.cache/uv/archive-v0/*/lib/python3.9  (5 entries; the healthy
+    user cache built python3.11)
+  - model_cache/.cache/uv/builds-v0/.tmp*             (7 orphaned interrupted
+    builds; uv removes these on success)
+  - model_cache/.cache/uv/environments-v2/            (no entry newer than
+    Jul 17 — uv never finished a usable env)
+  - model_cache/.local/share/uv/tools/                (empty, so `uvx whisperx`
+    can never reuse an installed tool and re-resolves every invocation)
+
+Those source builds take tens of minutes, hold model_cache/.cache/uv/.lock,
+and are killed under memory pressure, surfacing as SIGTERM (returncode=-15)
+with an empty stderr. This is why failures did NOT correlate with content
+length: only COLD runs pay the build cost. Runs that reuse an existing
+audio.tsv sidecar skip whisperx entirely and complete in ~1 minute.
+
+Reproduced and verified with the exact audio from a failed job
+(model_cache/.../text=The-biggest-lesson-.../audio.mp3, 61s):
+  - real HOME                     -> transcribed OK in 1m15s (exit 0)
+  - HOME=model_cache              -> hung >6 min with zero output, holding
+                                     model_cache/.cache/uv/.lock
+  - real HOME + HF_HOME preserved -> transcribed OK in ~93s  (the fix)
+
+Fix in _get_transcript_from_audio, when building the subprocess env:
+
+    env["HOME"] = pwd.getpwuid(os.getuid()).pw_dir   # from the password
+                                                     # database, so the
+                                                     # clobbered env cannot
+                                                     # fool us
+    env.pop("XDG_CACHE_HOME", None)
+
+HF_HOME is inherited unchanged, so whisperx model downloads still land in
+model_cache. Note the silero VAD torch-hub cache moves to ~/.cache/torch as a
+consequence; this matches the verified-working invocation.
+
+Also hardened in the same function:
+  - subprocess.run now passes timeout= (BRAINX_WHISPERX_TIMEOUT, default 900s)
+    so a hang fails in minutes instead of consuming the 3600s job budget.
+  - The retry loop no longer retries a NEGATIVE returncode. A signal death is
+    not the cold-start flake Change 3 targeted, and retrying multiplied it
+    across three nested layers (3 here x exca infra.retry x 2 in
+    backend/core/queue.py::_run_screen_inference_with_retry = up to 12
+    whisperx invocations for one screen).
+  - The error message now names the signal (e.g. SIGTERM) and includes the
+    stdout tail, not just stderr — stderr is empty precisely when the child is
+    signalled, which is why the original message carried no diagnostics.

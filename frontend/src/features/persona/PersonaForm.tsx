@@ -205,6 +205,7 @@ export function PersonaForm({ onCreated }: PersonaFormProps) {
   const mutation = useCreatePersonaMutation();
   const [step, setStep] = useState<StepIndex>(0);
   const [loadingField, setLoadingField] = useState<string | null>(null);
+  const [suggestError, setSuggestError] = useState<string | null>(null);
 
   const {
     register,
@@ -213,7 +214,7 @@ export function PersonaForm({ onCreated }: PersonaFormProps) {
     watch,
     setValue,
     trigger,
-    formState: { errors },
+    formState: { errors, isSubmitted },
   } = useForm<PersonaFormValues>({
     resolver: zodResolver(personaCreateSchema),
     defaultValues,
@@ -234,6 +235,7 @@ export function PersonaForm({ onCreated }: PersonaFormProps) {
 
   async function fillField(field: string) {
     setLoadingField(field);
+    setSuggestError(null);
     try {
       const result = await suggestPersonaField({
         name: values.name,
@@ -244,8 +246,13 @@ export function PersonaForm({ onCreated }: PersonaFormProps) {
       });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       setValue(field as any, result.value as any, { shouldDirty: true });
-    } catch {
-      // silently ignore — user can retry
+    } catch (error) {
+      // This used to be a bare `catch {}`. The backend sends an actionable
+      // detail (e.g. a missing DEEPSEEK_API_KEY), and swallowing it made the
+      // button look dead: the spinner flickered and nothing changed.
+      setSuggestError(
+        error instanceof Error ? error.message : "AI suggestion failed. Please retry.",
+      );
     } finally {
       setLoadingField(null);
     }
@@ -263,13 +270,18 @@ export function PersonaForm({ onCreated }: PersonaFormProps) {
     setStep((s) => (Math.max(s - 1, 0) as StepIndex));
   }
 
-  const onSubmit = handleSubmit(async (submittedValues) => {
-    const created = await mutation.mutateAsync({
-      ...submittedValues,
-      demographics: { ...submittedValues.demographics, background: submittedValues.demographics.background || null },
-      environment: { ...submittedValues.environment, ambient: submittedValues.environment.ambient || null },
-    });
-    onCreated(created);
+  // `mutate` rather than `mutateAsync`: a rejected mutateAsync escapes
+  // handleSubmit as an unhandled rejection, and the save just stopped spinning.
+  // The error is rendered below from mutation.error.
+  const onSubmit = handleSubmit((submittedValues) => {
+    mutation.mutate(
+      {
+        ...submittedValues,
+        demographics: { ...submittedValues.demographics, background: submittedValues.demographics.background || null },
+        environment: { ...submittedValues.environment, ambient: submittedValues.environment.ambient || null },
+      },
+      { onSuccess: (created) => onCreated(created) },
+    );
   });
 
   return (
@@ -302,6 +314,16 @@ export function PersonaForm({ onCreated }: PersonaFormProps) {
       <div style={{ marginBottom: 24 }}>
         <StepIndicator current={step} />
       </div>
+
+      {suggestError && (
+        <p
+          role="alert"
+          className="text-sm"
+          style={{ color: "var(--color-error)", marginBottom: 16 }}
+        >
+          {`AI fill failed: ${suggestError}`}
+        </p>
+      )}
 
       {/* ── Step 0: Demographics ── */}
       {step === 0 && (
@@ -490,6 +512,19 @@ export function PersonaForm({ onCreated }: PersonaFormProps) {
           </button>
         )}
       </div>
+
+      {/* Only step 0 renders per-field errors, so an invalid value on an
+          earlier step would otherwise make Save look dead. */}
+      {step === 3 && isSubmitted && Object.keys(errors).length > 0 ? (
+        <p role="alert" className="mt-3 text-sm" style={{ color: "var(--color-error)" }}>
+          {`Some fields are invalid (${Object.keys(errors).join(", ")}). Go back and check them.`}
+        </p>
+      ) : null}
+      {mutation.isError ? (
+        <p role="alert" className="mt-3 text-sm" style={{ color: "var(--color-error)" }}>
+          {`Could not save persona: ${mutation.error.message}`}
+        </p>
+      ) : null}
     </form>
   );
 }

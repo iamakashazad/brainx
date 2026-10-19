@@ -43,11 +43,13 @@ async def run_tribev2_text(text_content: str) -> np.ndarray:
     loop = asyncio.get_running_loop()
     model = get_model()
 
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as handle:
-        handle.write(text_content)
-        text_path = handle.name
-
     def _infer() -> np.ndarray:
+        # Created inside the executor task: a future cancelled by
+        # recycle_gpu_executor(cancel_futures=True) never runs, so a file made
+        # before submit was never cleaned up (and the write blocked the loop).
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as handle:
+            handle.write(text_content)
+            text_path = handle.name
         try:
             with torch.inference_mode():
                 df = model.get_events_dataframe(text_path=text_path)

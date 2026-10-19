@@ -154,6 +154,15 @@ class TestAggregateScreenROI:
             assert abs(row["score"] - 5.5) < 0.01
             assert abs(row["peak"] - 10.0) < 0.01
 
+    def test_all_negative_peaks_are_not_clipped_to_zero(
+        self,
+        fake_surface_fetch: dict[str, object],
+    ) -> None:
+        activation = np.vstack([np.full(20484, -3.0), np.full(20484, -1.0)])
+        bundle = aggregate_screen_roi(activation, get_surf_atlas())
+        for circuit in bundle["circuits"].values():
+            assert abs(circuit["peak"] - (-1.0)) < 0.01
+
 
 class TestRescale:
     def test_bounds(self) -> None:

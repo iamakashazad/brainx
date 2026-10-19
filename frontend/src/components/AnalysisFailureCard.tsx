@@ -14,12 +14,15 @@ import type { StageValue } from "@/lib/api-types";
 export function AnalysisFailureCard({
   errorMessage,
   stage,
+  retryError,
   onRetry,
   onBack,
   backLabel = "Go Back",
 }: {
   errorMessage?: string | null;
   stage?: StageValue | null;
+  /** Why the last "Try Again" itself failed (e.g. queue full), if it did. */
+  retryError?: string | null;
   onRetry: () => void;
   onBack: () => void;
   backLabel?: string;
@@ -57,6 +60,11 @@ export function AnalysisFailureCard({
             </p>
           </div>
         </div>
+        {retryError ? (
+          <p role="alert" className="mt-4 text-sm font-medium" style={{ color: "var(--color-error)" }}>
+            {`Retry failed: ${retryError}`}
+          </p>
+        ) : null}
         <div className="mt-8 flex flex-wrap gap-3">
           <button
             type="button"

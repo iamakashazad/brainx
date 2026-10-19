@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import uuid
 
 from fastapi import APIRouter, File, HTTPException, UploadFile, status
@@ -8,9 +9,20 @@ from backend.core import database
 from backend.core.config import settings
 from backend.models.content import Content, ContentType
 from backend.models.schemas import ContentCreated, TextContentRequest
-from backend.services.content_processing import ImageValidationError, process_upload
+from backend.services.content_processing import MAX_INPUT_BYTES, ImageValidationError, process_upload
 
 router = APIRouter()
+
+
+async def _process(upload: UploadFile, out_path) -> dict:
+    # Read one byte past the cap so oversize is still detected without buffering
+    # an arbitrarily large body, and decode/resize off the event loop — PIL work
+    # on 5 screens used to stall every poll and worker DB write for seconds.
+    raw = await upload.read(MAX_INPUT_BYTES + 1)
+    try:
+        return await asyncio.to_thread(process_upload, raw, out_path)
+    except ImageValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.post("/text", response_model=ContentCreated, status_code=status.HTTP_201_CREATED)
@@ -38,11 +50,7 @@ async def create_ui_screens(files: list[UploadFile] = File(...)) -> ContentCreat
     target_dir = settings.uploads_dir / content_id
     per_file_meta: list[dict] = []
     for index, upload in enumerate(files, start=1):
-        raw = await upload.read()
-        try:
-            meta = process_upload(raw, target_dir / f"screen_{index}.jpg")
-        except ImageValidationError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        meta = await _process(upload, target_dir / f"screen_{index}.jpg")
         per_file_meta.append({**meta, "original_filename": upload.filename, "index": index})
 
     row = Content(
@@ -62,11 +70,7 @@ async def create_ui_screens(files: list[UploadFile] = File(...)) -> ContentCreat
 async def create_static_content(file: UploadFile = File(...)) -> ContentCreated:
     content_id = str(uuid.uuid4())
     target_dir = settings.uploads_dir / content_id
-    raw = await file.read()
-    try:
-        meta = process_upload(raw, target_dir / "image.jpg")
-    except ImageValidationError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    meta = await _process(file, target_dir / "image.jpg")
 
     row = Content(
         id=content_id,

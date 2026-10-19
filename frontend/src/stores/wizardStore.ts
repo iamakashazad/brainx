@@ -18,6 +18,7 @@ type WizardState = {
   setStep: (step: WizardStep) => void;
   setPersona: (id: string | null) => void;
   setContent: (id: string, type: ContentType) => void;
+  clearContent: () => void;
   setJob: (id: string | null) => void;
   setActiveScreenIndex: (index: number) => void;
   setActiveCircuit: (circuit: CircuitName | null) => void;
@@ -45,6 +46,7 @@ export const useWizardStore = create<WizardState>()(
       setStep: (step) => set({ currentStep: step }),
       setPersona: (id) => set({ selectedPersonaId: id }),
       setContent: (id, type) => set({ contentId: id, contentType: type }),
+      clearContent: () => set({ contentId: null, contentType: null }),
       setJob: (id) => set({ jobId: id }),
       setActiveScreenIndex: (index) => set({ activeScreenIndex: index }),
       setActiveCircuit: (circuit) => set({ activeCircuit: circuit }),
@@ -59,13 +61,27 @@ export const useWizardStore = create<WizardState>()(
     {
       name: "brainx-wizard-state",
       storage: createJSONStorage(() => localStorage),
+      // contentId/contentType are deliberately NOT persisted. The uploaders keep
+      // their previews in local component state, which a reload destroys — so a
+      // rehydrated contentId pointed at content the user could no longer see,
+      // leaving "Run Analysis" enabled on a visibly empty step and submitting
+      // whatever was uploaded before the reload.
       partialize: (state) => ({
         currentStep: state.currentStep,
         selectedPersonaId: state.selectedPersonaId,
-        contentId: state.contentId,
-        contentType: state.contentType,
         jobId: state.jobId,
       }),
+      // Bumped when contentId/contentType left partialize: without this, entries
+      // already in localStorage would rehydrate them one last time and reproduce
+      // the phantom-enabled button exactly once per browser.
+      version: 1,
+      migrate: (persisted) => {
+        const { contentId: _c, contentType: _t, ...rest } = (persisted ?? {}) as Record<
+          string,
+          unknown
+        >;
+        return rest as unknown as WizardState;
+      },
     },
   ),
 );

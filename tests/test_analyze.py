@@ -16,7 +16,6 @@ from sqlalchemy import select
 from backend.core import database
 from backend.models.job import Job
 from backend.services.pathway_config import set_default_pathway
-from tests.fixtures.sim_log_3_screens import empty_narrative_screen, sim_log_3_screens
 
 pytestmark = pytest.mark.asyncio
 

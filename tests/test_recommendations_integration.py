@@ -628,3 +628,48 @@ class TestGenerateRecommendationsErrorSanitization:
             )
 
         assert leaked_key not in str(exc_info.value)
+
+
+async def test_evidence_score_snaps_to_cited_region_not_any_circuit():
+    """A hallucinated score must snap to the cited region's values, not to the
+    numerically closest score anywhere in the bundle (here a Reward peak)."""
+    from backend.models.recommendations import Recommendations
+    from backend.services.recommendations import _validate_evidence_against_roi
+
+    roi = [
+        {
+            "screen_index": 0,
+            "circuits": {
+                "Cognitive Load": {"score": 40.0, "peak": 45.0},
+                "Reward": {"score": 70.0, "peak": 86.9},
+            },
+            "regions": [
+                {"atlas_label": "G_front_middle", "circuit": "Cognitive Load", "score": 40.0, "peak": 44.0},
+            ],
+        }
+    ]
+    bundle = Recommendations.model_validate(
+        {
+            "recommendations": [
+                {
+                    "rec_type": "copy_rewrite",
+                    "screen_index": 0,
+                    "evidence": {
+                        "circuit": "Cognitive Load",
+                        "region": "G_front_middle",
+                        "activation_score": 87.0,
+                        "score_rank": "Very High",
+                    },
+                    "before": "Welcome to our product",
+                    "after": "Get started in 30 seconds",
+                    "rationale": "Shorter copy reduces friction.",
+                }
+            ]
+        }
+    )
+
+    _validate_evidence_against_roi(bundle, roi)
+
+    evidence = bundle.recommendations[0].evidence
+    assert evidence.activation_score == 45.0  # the circuit's own peak, the closest scoped value
+    assert evidence.activation_score != 86.9

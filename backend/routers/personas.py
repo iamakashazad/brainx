@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime as dt
+from typing import get_args
 
 from fastapi import APIRouter, HTTPException, Response, status
 from pydantic import BaseModel as PydanticBaseModel
@@ -8,8 +9,10 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from backend.core import database
-from backend.models.persona import Persona
+from backend.core.config import settings
+from backend.models.persona import CognitiveStateModel, EnvironmentModel, Persona
 from backend.models.schemas import PersonaCreate, PersonaRead, PersonaUpdate
+from backend.models.simulation import DeepSeekClientError, SchemaValidationFailure
 
 router = APIRouter()
 
@@ -39,6 +42,19 @@ _FIELD_IS_LIST = {
     "psychographics.goals",
     "psychographics.values",
     "psychographics.motivations",
+}
+
+# Fields backed by a Literal on the persona model. The LLM's answer is free text,
+# so it is normalised and checked against the model's own choices — otherwise a
+# reply like "Medium" fills the <select> with a value it has no option for and
+# the persona save later fails validation with nothing shown on that step.
+_FIELD_CHOICES: dict[str, tuple[str, ...]] = {
+    f"{prefix}.{name}": get_args(model.model_fields[name].annotation)
+    for prefix, model, names in (
+        ("cognitive_state", CognitiveStateModel, ("attention_span", "stress_level", "tech_literacy")),
+        ("environment", EnvironmentModel, ("device", "location")),
+    )
+    for name in names
 }
 
 _FIELD_PROMPTS: dict[str, str] = {
@@ -90,6 +106,17 @@ async def ai_suggest_persona_field(payload: AISuggestRequest) -> AISuggestRespon
     if payload.field not in _FIELD_PROMPTS:
         raise HTTPException(status_code=400, detail=f"Unknown field: {payload.field}")
 
+    # Mirror /analyze: a missing key is a 422 with an actionable detail, not a
+    # provider call that escapes as a plain-text 500 with no body the UI can show.
+    if not settings.deepseek_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "DEEPSEEK_API_KEY is not configured on the server. "
+                "Add it to .env and restart the backend."
+            ),
+        )
+
     ctx_lines = [
         f"Persona name: {payload.name}",
         f"Age: {payload.age}",
@@ -100,12 +127,34 @@ async def ai_suggest_persona_field(payload: AISuggestRequest) -> AISuggestRespon
     context = "\n".join(ctx_lines)
     user_prompt = f"{context}\n\n{_FIELD_PROMPTS[payload.field]}"
 
-    if payload.field in _FIELD_IS_LIST:
-        result = await deepseek_text_completion(_SYSTEM_PROMPT, user_prompt, _ListSuggestion)
-        return AISuggestResponse(value=result.value)
-    else:
-        result = await deepseek_text_completion(_SYSTEM_PROMPT, user_prompt, _StrSuggestion)
-        return AISuggestResponse(value=result.value)
+    schema = _ListSuggestion if payload.field in _FIELD_IS_LIST else _StrSuggestion
+    try:
+        result = await deepseek_text_completion(_SYSTEM_PROMPT, user_prompt, schema)
+    except SchemaValidationFailure as exc:
+        # The provider answered but not in the shape we asked for. 502 rather
+        # than 500: the fault is upstream, and the detail is worth showing.
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"AI suggestion returned an unusable response: {exc}",
+        ) from exc
+    except DeepSeekClientError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+    choices = _FIELD_CHOICES.get(payload.field)
+    if choices is not None:
+        normalised = str(result.value).strip().strip(".").lower()
+        if normalised not in choices:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=(
+                    f"AI suggestion {result.value!r} is not one of: {', '.join(choices)}. "
+                    "Please retry or pick a value."
+                ),
+            )
+        return AISuggestResponse(value=normalised)
+    return AISuggestResponse(value=result.value)
 
 
 # ── CRUD ──────────────────────────────────────────────────────────────────────

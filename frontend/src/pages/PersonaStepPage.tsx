@@ -115,7 +115,7 @@ function CreatePersonaCard({ onClick }: { onClick: () => void }) {
 export function PersonaStepPage() {
   const navigate = useNavigate();
   const [showForm, setShowForm] = useState(false);
-  const { data: personas, isLoading } = usePersonasQuery();
+  const { data: personas, isLoading, isError, error } = usePersonasQuery();
   const selectedPersonaId = useWizardStore((state) => state.selectedPersonaId);
   const setPersona = useWizardStore((state) => state.setPersona);
 
@@ -164,6 +164,13 @@ export function PersonaStepPage() {
               />
             ))}
           </div>
+        )}
+
+        {/* Without this a down backend looked like "you have no personas yet". */}
+        {isError && (
+          <p role="alert" className="text-sm font-medium" style={{ color: "var(--destructive)" }}>
+            {`Could not load personas: ${error.message}`}
+          </p>
         )}
 
         {/* Persona grid */}

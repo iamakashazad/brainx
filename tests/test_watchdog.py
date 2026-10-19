@@ -197,5 +197,37 @@ async def test_startup_recovery_marks_interrupted_active_jobs_error(client):
     assert pending.status == "ERROR"
     assert running.status == "ERROR"
     assert pending.queue_position is None
-    assert running.stage is None
+    # The stage it died in is preserved for diagnosis (CLAUDE.md invariant).
+    assert running.stage == "inference"
     assert "interrupted" in (pending.error_message or "").lower()
+
+
+async def test_stale_pending_job_is_removed_from_queue_and_never_run(client):
+    """A job the UI was told failed must not be silently run to DONE later."""
+    stale_at = dt.datetime.utcnow() - dt.timedelta(seconds=settings.job_timeout_seconds + 120)
+    await _insert_pending_job("stale-queued-job", stale_at)
+    # Append without waking the app's live worker (put_nowait would let it
+    # dequeue the job before the sweep runs).
+    queue_manager.gpu_queue._queue.append("stale-queued-job")  # noqa: SLF001
+
+    try:
+        assert await queue_manager.mark_stale_active_jobs() == 1
+        assert "stale-queued-job" not in queue_manager._pending_job_ids()
+
+        # Even if the worker had already dequeued it, the claim must refuse.
+        await queue_manager._process_job("stale-queued-job")
+        job = await _get_job("stale-queued-job")
+        assert job.status == "ERROR"
+        assert "timed out" in (job.error_message or "").lower()
+    finally:
+        queue_manager._remove_pending_job("stale-queued-job")
+
+
+async def test_stale_flip_does_not_overwrite_a_running_job(client):
+    """The flip is compare-and-set on PENDING, so a worker claim wins the race."""
+    stale_at = dt.datetime.utcnow() - dt.timedelta(seconds=settings.job_timeout_seconds + 120)
+    await _insert_running_job("raced-running-job", stale_at)
+
+    assert await queue_manager.fail_stale_pending_job("raced-running-job") is False
+    job = await _get_job("raced-running-job")
+    assert job.status == "RUNNING"

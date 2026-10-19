@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class TargetRegion(BaseModel):
@@ -34,6 +34,24 @@ class Screen(BaseModel):
 
 class SimulationLog(BaseModel):
     screens: list[Screen] = Field(min_length=1, max_length=5)
+
+    @model_validator(mode="after")
+    def _screen_indices_are_zero_based_and_contiguous(self) -> "SimulationLog":
+        # Downstream code keys activations (screen_{i+1}.npy), the ROI map and
+        # recommendation bounds on screen_index, so duplicates or gaps silently
+        # overwrite or drop screens. A consistently 1-based log is the common LLM
+        # slip and is safe to renumber; anything else is rejected (and retried).
+        indices = [screen.screen_index for screen in self.screens]
+        count = len(indices)
+        if sorted(indices) == list(range(1, count + 1)):
+            for screen in self.screens:
+                screen.screen_index -= 1
+        elif sorted(indices) != list(range(count)):
+            raise ValueError(
+                f"screen_index values must be exactly 0..{count - 1} with no duplicates, got {indices}"
+            )
+        self.screens.sort(key=lambda screen: screen.screen_index)
+        return self
 
 
 class HallucinationItem(BaseModel):

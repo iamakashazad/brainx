@@ -160,7 +160,7 @@ def aggregate_screen_roi(
         )
 
     circuits: dict[str, dict[str, float]] = {
-        name: {"score": 0.0, "peak": 0.0} for name in ROI_CIRCUIT_MAP
+        name: {"score": 0.0, "peak": float("-inf")} for name in ROI_CIRCUIT_MAP
     }
     per_circuit_count = Counter(row["circuit"] for row in region_rows)
     for row in region_rows:
@@ -171,6 +171,10 @@ def aggregate_screen_roi(
         count = per_circuit_count.get(name, 0)
         if count:
             agg["score"] = agg["score"] / count
+        else:
+            # No regions: 0.0 as before. Starting every peak at 0.0 also clipped
+            # circuits whose regional peaks were all negative up to 0.0.
+            agg["peak"] = 0.0
 
     return {"circuits": circuits, "regions": region_rows}
 

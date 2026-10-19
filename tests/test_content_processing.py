@@ -48,3 +48,23 @@ def test_mime_spoof_raises(tmp_path: Path) -> None:
 def test_empty_raises(tmp_path: Path) -> None:
     with pytest.raises(ImageValidationError, match="empty"):
         process_upload(b"", tmp_path / "x.jpg")
+
+
+@pytest.mark.filterwarnings("ignore::PIL.Image.DecompressionBombWarning")
+def test_huge_dimensions_are_refused_before_decode(tmp_path: Path) -> None:
+    """A tiny 1-bit PNG with enormous dimensions must not be decoded to RGB."""
+    from io import BytesIO
+
+    from PIL import Image
+
+    from backend.services.content_processing import MAX_DECODED_PIXELS
+
+    buf = BytesIO()
+    Image.new("1", (8000, 8000)).save(buf, format="PNG")  # 64 MP, a few KB on disk
+    raw = buf.getvalue()
+    assert len(raw) < 1024 * 1024
+    assert 8000 * 8000 > MAX_DECODED_PIXELS
+
+    with pytest.raises(ImageValidationError, match="max"):
+        process_upload(raw, tmp_path / "bomb.jpg")
+    assert not (tmp_path / "bomb.jpg").exists()

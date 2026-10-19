@@ -5,6 +5,7 @@ from pathlib import Path
 
 import numpy as np
 from fastapi import APIRouter, HTTPException, Response
+from pydantic import ValidationError
 from sqlalchemy import select
 
 from backend.core import database
@@ -25,7 +26,15 @@ async def get_screen_activation(job_id: str, screen_index: int) -> Response:
     if job is None or job.status != "DONE" or job.result_json is None:
         raise HTTPException(status_code=404, detail=f"Job {job_id} not found or not complete")
 
-    envelope = AnalysisResult.model_validate(job.result_json)
+    try:
+        envelope = AnalysisResult.model_validate(job.result_json)
+    except ValidationError as exc:
+        # Legacy /test-inference jobs and pre-schema envelopes have no per-screen
+        # manifest; that is "no such activation", not a server error.
+        raise HTTPException(
+            status_code=404,
+            detail=f"Job {job_id} has no per-screen activations (result predates the current schema)",
+        ) from exc
     manifest_entry = next(
         (entry for entry in envelope.activations if entry.screen_index == screen_index),
         None,

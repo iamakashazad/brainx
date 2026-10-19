@@ -10,13 +10,18 @@ type UploadDropZoneProps = {
   onFiles: (files: File[]) => void;
 };
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024;
+// Must match MAX_INPUT_BYTES in backend/services/content_processing.py. When the
+// client limit was larger, an oversized file passed this check, previewed as if
+// it had uploaded, was rejected server-side, and left "Run Analysis" disabled
+// with nothing on screen to explain why.
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
+const MAX_FILE_SIZE_LABEL = `${MAX_FILE_SIZE / (1024 * 1024)} MB`;
 
 function filterFiles(files: File[], accept?: string) {
   const rejected: string[] = [];
   const accepted = files.filter((file) => {
     if (file.size > MAX_FILE_SIZE) {
-      rejected.push(`${file.name} is larger than 10 MB.`);
+      rejected.push(`${file.name} is larger than ${MAX_FILE_SIZE_LABEL}.`);
       return false;
     }
     if (accept === "image/*" && !file.type.startsWith("image/")) {

@@ -23,7 +23,10 @@ export function useCreatePersonaMutation() {
 export function useDeletePersonaMutation() {
   const queryClient = useQueryClient();
 
-  return useMutation({
+  // The backend returns 409 with an explanatory detail when a persona is still
+  // referenced by existing jobs. Callers must render `error` — otherwise the
+  // delete looks like it silently did nothing.
+  return useMutation<void, Error, string>({
     mutationFn: (personaId: string) => deletePersona(personaId),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["personas"] });

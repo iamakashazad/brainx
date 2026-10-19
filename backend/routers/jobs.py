@@ -82,8 +82,8 @@ async def get_job_status(job_id: str) -> JobStatusResponse:
         job = result.scalar_one_or_none()
 
         if job is not None and queue_manager.should_mark_stale_active(job, now):
-            queue_manager.mark_stale_active_job(job)
-            await session.commit()
+            if await queue_manager.fail_stale_pending_job(job.id):
+                await session.refresh(job)
 
     if job is None:
         raise HTTPException(status_code=404, detail=f"Job {job_id} not found")

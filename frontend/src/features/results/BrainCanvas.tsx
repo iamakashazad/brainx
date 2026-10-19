@@ -8,10 +8,15 @@ import { NEUTRAL_BASE } from "./oklchToLinear";
 import { useActivation } from "./useActivation";
 import { useMeshGeometry } from "./useMeshGeometry";
 import { useParcellation } from "./useParcellation";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 type BrainCanvasProps = {
   jobId: string | null;
   regions: RegionScore[];
+  /** Screen to show. Callers pass the index they actually rendered (clamped to
+   * this job's screens): the store's raw index can belong to a previous job and
+   * fetch an activation that does not exist, leaving the brain grey. */
+  screenIndex: number;
 };
 
 function makeNeutralBuffer() {
@@ -24,12 +29,11 @@ function makeNeutralBuffer() {
   return buf;
 }
 
-export function BrainCanvas({ jobId, regions }: BrainCanvasProps) {
+export function BrainCanvas({ jobId, regions, screenIndex }: BrainCanvasProps) {
   const activeCircuit = useWizardStore((state) => state.activeCircuit);
-  const activeScreenIndex = useWizardStore((state) => state.activeScreenIndex);
   const meshQuery = useMeshGeometry();
   const parcellationQuery = useParcellation();
-  const activationQuery = useActivation(jobId, activeScreenIndex);
+  const activationQuery = useActivation(jobId, screenIndex);
   const [colorState, setColorState] = useState<{ buf: Float32Array; v: number }>(() => ({
     buf: makeNeutralBuffer(),
     v: 0,
@@ -58,6 +62,13 @@ export function BrainCanvas({ jobId, regions }: BrainCanvasProps) {
 
   return (
     <div className="h-[60vh] overflow-hidden rounded-3xl border border-border bg-card shadow-xl">
+      <ErrorBoundary
+        fallback={(error) => (
+          <div role="alert" className="flex h-full items-center justify-center p-6 text-center text-sm text-muted-foreground">
+            {`The 3D brain view could not start (${error.message}). Scores and recommendations below are unaffected.`}
+          </div>
+        )}
+      >
       <Canvas>
         <ambientLight intensity={0.4} />
         <directionalLight position={[5, 10, 7]} intensity={0.9} />
@@ -76,6 +87,12 @@ export function BrainCanvas({ jobId, regions }: BrainCanvasProps) {
         </mesh>
         <OrbitControls enableDamping />
       </Canvas>
+      </ErrorBoundary>
+      {activationQuery.isError ? (
+        <p role="alert" className="px-4 py-2 text-sm text-destructive">
+          {`Could not load activations for screen ${screenIndex + 1}: ${activationQuery.error.message}`}
+        </p>
+      ) : null}
       <div className="sr-only" aria-live="polite">
         {activationQuery.isLoading || meshQuery.isLoading || parcellationQuery.isLoading
           ? "Brain activation preview loading."

@@ -19,7 +19,7 @@
  *   - Circuit Selector pill toggles
  *   - Timeline Scrubber (multi-screen only)
  *   - ROI Score Table
- *   - WebGL failure fallback
+ *   - WebGL failure fallback (ErrorBoundary inside BrainCanvas)
  *
  * Circuits tab:
  *   - Screen selector pill tabs
@@ -40,7 +40,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Share2, Check, ArrowLeft } from "lucide-react";
 
 import { Button, PillButton, Surface } from "@/components/design-system";
-import { useJobStatus } from "@/features/run/useJobStatus";
+import { isJobPollingStopped, useJobStatus } from "@/features/run/useJobStatus";
 import { usePersonasQuery } from "@/features/persona/usePersonas";
 import { useWizardStore } from "@/stores/wizardStore";
 import { AnalysisFailureCard } from "@/components/AnalysisFailureCard";
@@ -306,14 +306,15 @@ function BrainExplorerTab({
 
   if (!result) return null;
 
-  const currentScreen = result.roi[activeScreenIndex] ?? result.roi[0];
+  const screenIndex = result.roi[activeScreenIndex] ? activeScreenIndex : 0;
+  const currentScreen = result.roi[screenIndex];
   if (!currentScreen) return null;
 
   const isMultiScreen = result.roi.length > 1;
 
   return (
     <div className="space-y-6">
-      <BrainCanvas jobId={jobId} regions={currentScreen.regions} />
+      <BrainCanvas jobId={jobId} regions={currentScreen.regions} screenIndex={screenIndex} />
 
       {/* Preset buttons */}
       <div className="flex flex-wrap gap-2">
@@ -337,7 +338,7 @@ function BrainExplorerTab({
       {isMultiScreen && (
         <TimelineScrubber
           screenCount={result.roi.length}
-          value={activeScreenIndex}
+          value={screenIndex}
           onChange={setActiveScreenIndex}
         />
       )}
@@ -575,7 +576,13 @@ export function ResultsPage() {
   const isRedirecting = job?.status === "RUNNING" || job?.status === "PENDING";
   const showFailure =
     !isRedirecting &&
-    (job?.status === "ERROR" || (jobQuery.isError && !jobQuery.isFetching));
+    (job?.status === "ERROR" ||
+      isJobPollingStopped(jobId, {
+        status: job?.status,
+        error: jobQuery.error,
+        errorUpdateCount: jobQuery.errorUpdateCount,
+        isFetching: jobQuery.isFetching,
+      }));
 
   if (isRedirecting) return null;
 
@@ -645,7 +652,7 @@ export function ResultsPage() {
         {/* Failed job / unreachable job — terminal error card */}
         {!jobQuery.isLoading && showFailure && (
           <AnalysisFailureCard
-            errorMessage={job?.error}
+            errorMessage={job?.error ?? jobQuery.error?.message}
             stage={job?.stage}
             onRetry={() => navigate("/analysis/new/content")}
             onBack={() => navigate("/")}

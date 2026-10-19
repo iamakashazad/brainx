@@ -10,7 +10,6 @@ import pytest
 import respx
 
 from backend.services.roi_aggregation import CIRCUIT_NAMES
-from tests.fixtures.sim_log_3_screens import sim_log_3_screens  # noqa: F401
 
 pytestmark = pytest.mark.asyncio
 
@@ -331,3 +330,25 @@ class TestModelImports:
         assert SCHEMA_VERSION == 1
         assert FlowContinuity is not None
         assert AnalysisResult is not None
+
+
+async def test_simulation_log_renumbers_one_based_screens():
+    from backend.models.simulation import SimulationLog
+
+    def screen(i):
+        return {"screen_index": i, "narrative_text": "x", "summary_emotional_state": "calm", "memorability_hypothesis": "m"}
+
+    log = SimulationLog.model_validate({"screens": [screen(2), screen(1)]})
+    assert [s.screen_index for s in log.screens] == [0, 1]
+
+
+async def test_simulation_log_rejects_duplicate_screen_indices():
+    from pydantic import ValidationError
+
+    from backend.models.simulation import SimulationLog
+
+    def screen(i):
+        return {"screen_index": i, "narrative_text": "x", "summary_emotional_state": "calm", "memorability_hypothesis": "m"}
+
+    with pytest.raises(ValidationError, match="no duplicates"):
+        SimulationLog.model_validate({"screens": [screen(0), screen(0)]})

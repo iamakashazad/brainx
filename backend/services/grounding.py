@@ -8,7 +8,6 @@ from pydantic import ValidationError
 from backend.core.config import settings
 from backend.models.content import Content, ContentType
 from backend.models.simulation import (
-    DeepSeekClientError,
     GroundingVerdict,
     HallucinationError,
     SimulationLog,

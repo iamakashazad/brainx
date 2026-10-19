@@ -42,4 +42,53 @@ describe("wizard store persistence", () => {
     expect(useWizardStore.getState().currentStep).toBe(2);
     expect(useWizardStore.getState().selectedPersonaId).toBe("p-existing");
   });
+
+  it("clearContent drops both contentId and contentType", () => {
+    useWizardStore.getState().setContent("c-1", "static");
+    expect(useWizardStore.getState().contentId).toBe("c-1");
+
+    useWizardStore.getState().clearContent();
+
+    expect(useWizardStore.getState().contentId).toBeNull();
+    expect(useWizardStore.getState().contentType).toBeNull();
+  });
+
+  it("never persists contentId/contentType", async () => {
+    useWizardStore.getState().setPersona("p-1");
+    useWizardStore.getState().setContent("c-should-not-persist", "text");
+
+    await waitFor(() => {
+      expect(localStorage.getItem("brainx-wizard-state")).toContain("p-1");
+    });
+
+    const stored = localStorage.getItem("brainx-wizard-state") ?? "";
+    expect(stored).not.toContain("c-should-not-persist");
+    const parsed = JSON.parse(stored) as { state: Record<string, unknown> };
+    expect(parsed.state.contentId).toBeUndefined();
+    expect(parsed.state.contentType).toBeUndefined();
+  });
+
+  it("does not rehydrate contentId from a pre-migration payload", async () => {
+    // A v0 entry written before contentId left partialize. Rehydrating it would
+    // re-enable "Run Analysis" on a visibly empty content step and submit
+    // content the user could no longer see.
+    localStorage.setItem(
+      "brainx-wizard-state",
+      JSON.stringify({
+        state: {
+          currentStep: 2,
+          selectedPersonaId: "p-existing",
+          contentId: "c-stale",
+          contentType: "ui_screens",
+        },
+        version: 0,
+      }),
+    );
+
+    await useWizardStore.persist.rehydrate();
+
+    expect(useWizardStore.getState().selectedPersonaId).toBe("p-existing");
+    expect(useWizardStore.getState().contentId).toBeNull();
+    expect(useWizardStore.getState().contentType).toBeNull();
+  });
 });

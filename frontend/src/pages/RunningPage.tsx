@@ -12,11 +12,11 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Check, AlertTriangle, ArrowLeft, Square } from "lucide-react";
-import { useJobStatus } from "@/features/run/useJobStatus";
+import { isJobPollingStopped, useJobStatus } from "@/features/run/useJobStatus";
 import { useSubmitAnalyze } from "@/features/wizard/useSubmitAnalyze";
 import { useWizardStore } from "@/stores/wizardStore";
 import { deleteJob } from "@/lib/api";
@@ -149,9 +149,14 @@ export function RunningPage() {
   const selectedPersonaId = useWizardStore((s) => s.selectedPersonaId);
   const contentId = useWizardStore((s) => s.contentId);
   const retryMutation = useSubmitAnalyze();
-  const stopMutation = useMutation({
+  const queryClient = useQueryClient();
+  const stopMutation = useMutation<void, Error>({
     mutationFn: () => deleteJob(jobId!),
     onSuccess: () => {
+      // Without these the Dashboard keeps listing the deleted job for its
+      // staleTime, and opening it lands on a 404 failure card.
+      queryClient.removeQueries({ queryKey: ["job", jobId] });
+      void queryClient.invalidateQueries({ queryKey: ["jobs"] });
       setJob(null);
       navigate("/analysis/new/content", { replace: true });
     },
@@ -193,15 +198,34 @@ export function RunningPage() {
   const status = jobQuery.data?.status ?? "PENDING";
   const queuePosition = jobQuery.data?.queue_position ?? null;
 
-  const shouldShowFailure =
-    status === "ERROR" || (jobQuery.isError && !jobQuery.isFetching);
+  // Only once polling has actually given up: `isError && !isFetching` alone is
+  // true between every 2s retry, so the failure card used to flash in and out.
+  const pollingStopped = isJobPollingStopped(jobId, {
+    status: jobQuery.data?.status,
+    error: jobQuery.error,
+    errorUpdateCount: jobQuery.errorUpdateCount,
+    isFetching: jobQuery.isFetching,
+  });
+  const shouldShowFailure = status === "ERROR" || pollingStopped;
 
   if (shouldShowFailure) {
     return (
       <AnalysisFailureCard
-        errorMessage={jobQuery.data?.error}
-        stage={jobQuery.data?.stage}
+        errorMessage={
+          status === "ERROR"
+            ? jobQuery.data?.error
+            : `Lost contact with the server: ${jobQuery.error?.message ?? "unknown error"}`
+        }
+        // The stage prefix ("Failed during …") is only true for a job that failed.
+        stage={status === "ERROR" ? jobQuery.data?.stage : null}
+        retryError={retryMutation.error?.message ?? null}
         onRetry={() => {
+          // A connection loss says nothing about the job itself, which may still
+          // be running server-side: check again rather than submit a duplicate.
+          if (status !== "ERROR") {
+            void jobQuery.refetch();
+            return;
+          }
           if (selectedPersonaId && contentId) {
             retryMutation.mutate();
             return;
@@ -264,6 +288,11 @@ export function RunningPage() {
             {stopMutation.isPending ? "Stopping…" : "Stop and delete"}
           </button>
         </div>
+        {stopMutation.isError ? (
+          <p role="alert" className="text-right text-sm font-medium" style={{ color: "var(--destructive)" }}>
+            {`Could not stop the analysis: ${stopMutation.error.message}`}
+          </p>
+        ) : null}
 
         {/* Retry banner */}
         {showRetryBanner && (

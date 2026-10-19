@@ -48,7 +48,8 @@ export function ResultsLayout({ resultOverride, jobIdOverride }: ResultsLayoutPr
     );
   }
 
-  const currentScreen = result.roi[activeScreenIndex] ?? result.roi[0]!;
+  const screenIndex = result.roi[activeScreenIndex] ? activeScreenIndex : 0;
+  const currentScreen = result.roi[screenIndex]!;
 
   return (
     <section className="space-y-6">
@@ -61,14 +62,14 @@ export function ResultsLayout({ resultOverride, jobIdOverride }: ResultsLayoutPr
 
       <div className="grid grid-cols-1 gap-8 p-2 lg:grid-cols-[3fr_2fr]">
         <div className="space-y-5">
-          <BrainCanvas jobId={jobId} regions={currentScreen.regions} />
+          <BrainCanvas jobId={jobId} regions={currentScreen.regions} screenIndex={screenIndex} />
           <div className="flex flex-wrap items-center justify-between gap-3">
             <CircuitSelector circuits={currentScreen.circuits} />
             <BrainPresetButtons activePreset={activePreset} onPresetChange={setActivePreset} />
           </div>
           <TimelineScrubber
             screenCount={result.roi.length}
-            value={activeScreenIndex}
+            value={screenIndex}
             onChange={setActiveScreenIndex}
           />
         </div>

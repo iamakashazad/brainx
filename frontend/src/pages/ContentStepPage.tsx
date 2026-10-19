@@ -13,6 +13,7 @@
  */
 
 import type { CSSProperties } from "react";
+import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import * as Tabs from "@radix-ui/react-tabs";
 import { ArrowLeft } from "lucide-react";
@@ -23,6 +24,7 @@ import { isQueueBusyError, useSubmitAnalyze } from "@/features/wizard/useSubmitA
 import { ScreenUploader } from "@/features/content/ScreenUploader";
 import { StaticUploader } from "@/features/content/StaticUploader";
 import { TextInput } from "@/features/content/TextInput";
+import { discardContent } from "@/features/content/useUploadContent";
 
 const STEPS = ["Persona", "Content", "Review"] as const;
 
@@ -43,10 +45,21 @@ const tabTriggerStyle = (isActive: boolean): CSSProperties => ({
 
 /* ── Page ─────────────────────────────────────────────────────────────── */
 
+/** Which stored contentType each tab is allowed to submit. */
+const TAB_CONTENT_TYPE = {
+  screens: "ui_screens",
+  static: "static",
+  text: "text",
+} as const;
+
+type TabValue = keyof typeof TAB_CONTENT_TYPE;
+
 export function ContentStepPage() {
   const navigate = useNavigate();
   const selectedPersonaId = useWizardStore((s) => s.selectedPersonaId);
   const contentId = useWizardStore((s) => s.contentId);
+  const contentType = useWizardStore((s) => s.contentType);
+  const [activeTab, setActiveTab] = useState<TabValue>("screens");
   const personasQuery = usePersonasQuery();
   const submitMutation = useSubmitAnalyze();
   const queueBusy = isQueueBusyError(submitMutation.error);
@@ -54,7 +67,17 @@ export function ContentStepPage() {
   const personas = personasQuery.data ?? [];
   const selectedPersona = personas.find((p) => p.id === selectedPersonaId);
 
-  const canSubmit = Boolean(selectedPersonaId && contentId) && !submitMutation.isPending;
+  // Requiring contentType to match the visible tab stops the wizard submitting
+  // content belonging to a tab the user has navigated away from. contentType was
+  // previously stored but never read by anything.
+  const contentMatchesTab = contentType === TAB_CONTENT_TYPE[activeTab];
+  // A persona deleted since it was selected would otherwise just hide its chip
+  // and still submit (to a 404). Only enforce once the list has loaded.
+  const personaMissing = personasQuery.isSuccess && !selectedPersona;
+  const canSubmit =
+    Boolean(selectedPersonaId && contentId && contentMatchesTab) &&
+    !personaMissing &&
+    !submitMutation.isPending;
 
   return (
     <div className="min-h-screen px-6 py-10" style={{ background: "var(--background)" }}>
@@ -108,7 +131,17 @@ export function ContentStepPage() {
         )}
 
         {/* Content type tabs */}
-        <Tabs.Root defaultValue="screens" className="space-y-6">
+        <Tabs.Root
+          value={activeTab}
+          onValueChange={(value) => {
+            setActiveTab(value as TabValue);
+            // Radix unmounts the previous Tabs.Content (no forceMount), which
+            // destroys that uploader's preview. Dropping the stored content keeps
+            // the store consistent with what the user can actually see.
+            discardContent();
+          }}
+          className="space-y-6"
+        >
           <Tabs.List
             className="flex gap-2 flex-wrap"
             aria-label="Content type"
@@ -192,6 +225,16 @@ export function ContentStepPage() {
         {queueBusy ? (
           <p className="text-right text-sm font-medium" role="alert" style={{ color: "var(--destructive)" }}>
             The analysis queue is full. Please try again in a moment.
+          </p>
+        ) : submitMutation.isError ? (
+          // e.g. a 422 for a missing provider key, or 404 for deleted content.
+          <p className="text-right text-sm font-medium" role="alert" style={{ color: "var(--destructive)" }}>
+            {`Could not start the analysis: ${submitMutation.error.message}`}
+          </p>
+        ) : null}
+        {personaMissing && selectedPersonaId ? (
+          <p className="text-right text-sm font-medium" role="alert" style={{ color: "var(--destructive)" }}>
+            The selected persona no longer exists. Go back and choose another.
           </p>
         ) : null}
 

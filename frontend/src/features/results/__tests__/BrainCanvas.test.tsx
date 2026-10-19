@@ -60,7 +60,7 @@ describe("BrainCanvas", () => {
   });
 
   it("requests the active screen activation and forwards the exact buffer into computeColorBuffer", async () => {
-    render(<BrainCanvas jobId="job-1" regions={[]} />);
+    render(<BrainCanvas jobId="job-1" regions={[]} screenIndex={0} />);
 
     await waitFor(() => {
       expect(useActivation).toHaveBeenCalledWith("job-1", 0);

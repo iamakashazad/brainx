@@ -10,6 +10,7 @@ import httpx
 
 from backend.core.config import settings
 from backend.models.simulation import DeepSeekClientError
+from backend.services.http_errors import provider_error_message
 
 logger = logging.getLogger(__name__)
 
@@ -20,13 +21,7 @@ MISSING_TOKEN_ERROR = (
 
 
 def _http_error_message(exc: Exception) -> str:
-    if isinstance(exc, httpx.HTTPStatusError):
-        return f"Replicate request failed (HTTP {exc.response.status_code}). Please retry."
-    if isinstance(exc, httpx.TimeoutException):
-        return "Replicate request timed out. Please retry."
-    if isinstance(exc, httpx.HTTPError):
-        return "Could not reach Replicate (network error). Please retry."
-    return f"Vision analysis failed: {exc}"
+    return provider_error_message("Replicate", exc, secrets=(settings.replicate_api_token,))
 
 
 _version_cache: dict[str, str] = {}

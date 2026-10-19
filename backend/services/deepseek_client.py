@@ -8,6 +8,7 @@ from pydantic import BaseModel, ValidationError
 
 from backend.core.config import settings
 from backend.models.simulation import DeepSeekClientError, SchemaValidationFailure
+from backend.services.http_errors import provider_error_message
 
 logger = logging.getLogger(__name__)
 
@@ -17,12 +18,8 @@ MISSING_KEY_ERROR = (
 )
 
 
-def _http_error_message(exc: httpx.HTTPError) -> str:
-    if isinstance(exc, httpx.HTTPStatusError):
-        return f"DeepSeek request failed (HTTP {exc.response.status_code}). Please retry."
-    if isinstance(exc, httpx.TimeoutException):
-        return "DeepSeek request timed out. Please retry."
-    return "Could not reach DeepSeek (network error). Please retry."
+def _http_error_message(exc: Exception) -> str:
+    return provider_error_message("DeepSeek", exc, secrets=(settings.deepseek_api_key,))
 
 
 async def deepseek_text_completion(
@@ -61,7 +58,13 @@ async def deepseek_text_completion(
             logger.error("DeepSeek request failed", exc_info=exc)
             raise DeepSeekClientError(_http_error_message(exc)) from exc
 
-        raw = response.json()["choices"][0]["message"]["content"] or ""
+        try:
+            raw = response.json()["choices"][0]["message"]["content"] or ""
+        except (ValueError, KeyError, IndexError, TypeError) as exc:
+            # A 200 with an unexpected body used to escape as a bare 500.
+            raise DeepSeekClientError(
+                f"DeepSeek returned an unexpected response body: {response.text[:300]}"
+            ) from exc
         try:
             return response_model.model_validate_json(raw)
         except ValidationError as exc:

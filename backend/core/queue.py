@@ -7,7 +7,7 @@ import shutil
 from pathlib import Path
 
 import numpy as np
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.core import database
@@ -88,17 +88,23 @@ async def cancel_and_delete_job(job_id: str) -> bool:
         async with database.async_session() as session:
             job = (await session.execute(select(Job).where(Job.id == job_id))).scalar_one_or_none()
             if job is None:
+                cancel_requested.discard(job_id)
                 await sync_pending_queue_positions()
                 return False
             should_cleanup_processes = job.status == "RUNNING"
             await session.delete(job)
             await session.commit()
 
-        if should_cleanup_processes:
-            cleanup_workspace_whisperx_processes()
-        _delete_job_artifacts(job_id)
-        await sync_pending_queue_positions()
-        return True
+    # pgrep/SIGTERM and rmtree are blocking; run them off the event loop and
+    # outside queue_capacity_lock so a delete cannot stall polls and /analyze.
+    if should_cleanup_processes:
+        await asyncio.to_thread(cleanup_workspace_whisperx_processes)
+    else:
+        # Never dequeued by the worker, so nothing else would discard it.
+        cancel_requested.discard(job_id)
+    await asyncio.to_thread(_delete_job_artifacts, job_id)
+    await sync_pending_queue_positions()
+    return True
 
 
 def _is_cancelled(job_id: str) -> bool:
@@ -138,8 +144,9 @@ async def mark_interrupted_jobs() -> int:
         jobs = result.scalars().all()
 
         for job in jobs:
+            # job.stage is left as-is: which stage a job died in is the main clue
+            # when diagnosing an interruption.
             job.status = "ERROR"
-            job.stage = None
             job.queue_position = None
             job.error_message = (
                 "Analysis was interrupted before it finished. "
@@ -165,13 +172,34 @@ def should_mark_stale_active(job: Job, now: dt.datetime) -> bool:
     return (now - last_progress).total_seconds() > stale_after
 
 
-def mark_stale_active_job(job: Job) -> None:
-    job.status = "ERROR"
-    job.queue_position = None
-    job.error_message = (
+def _stale_error_message() -> str:
+    return (
         f"Analysis timed out after no progress for {settings.job_timeout_seconds} seconds. "
         "The worker may have stopped or the content may be too large."
     )
+
+
+async def fail_stale_pending_job(job_id: str) -> bool:
+    """Flip a stale PENDING job to ERROR and drop it from the in-memory queue.
+
+    The write is a compare-and-set on status='PENDING' so it cannot overwrite a
+    job the worker has just claimed as RUNNING, and the queue entry is removed so
+    the worker never runs a job the UI has already been told failed (it used to
+    run it to DONE anyway, and the ghost entry kept counting toward the 503 cap).
+    """
+    async with queue_capacity_lock:
+        async with database.async_session() as session:
+            result = await session.execute(
+                update(Job)
+                .where(Job.id == job_id, Job.status == "PENDING")
+                .values(status="ERROR", queue_position=None, error_message=_stale_error_message())
+            )
+            await session.commit()
+        if not result.rowcount:
+            return False
+        _remove_pending_job(job_id)
+    await sync_pending_queue_positions()
+    return True
 
 
 async def mark_stale_active_jobs() -> int:
@@ -179,17 +207,13 @@ async def mark_stale_active_jobs() -> int:
     now = dt.datetime.utcnow()
     async with database.async_session() as session:
         result = await session.execute(select(Job).where(Job.status == "PENDING"))
-        jobs = result.scalars().all()
+        stale_ids = [job.id for job in result.scalars() if should_mark_stale_active(job, now)]
 
-        flipped = 0
-        for job in jobs:
-            if should_mark_stale_active(job, now):
-                mark_stale_active_job(job)
-                flipped += 1
-
-        if flipped:
-            await session.commit()
-        return flipped
+    flipped = 0
+    for job_id in stale_ids:
+        if await fail_stale_pending_job(job_id):
+            flipped += 1
+    return flipped
 
 
 async def stale_job_sweeper(interval_seconds: int = 60) -> None:
@@ -321,11 +345,16 @@ async def _mark_failed(job_id: str, exc: BaseException) -> None:
 
 
 async def _mark_timed_out(job_id: str, timeout_seconds: int) -> None:
-    await _fail_job(
-        job_id,
-        f"Analysis timed out after {timeout_seconds} seconds. "
-        "Please try again with shorter content.",
-    )
+    # Guarded like _mark_failed: an exception here (e.g. "database is locked")
+    # used to escape the worker loop and leave the row RUNNING until restart.
+    try:
+        await _fail_job(
+            job_id,
+            f"Analysis timed out after {timeout_seconds} seconds. "
+            "Please try again with shorter content.",
+        )
+    except Exception:
+        logger.exception("could not mark job %s as timed out", job_id)
 
 
 async def _process_job(job_id: str) -> None:
@@ -338,8 +367,17 @@ async def _process_job(job_id: str) -> None:
         if job is None:
             return
 
-        job.status = "RUNNING"
-        job.queue_position = None
+        # Claim with a compare-and-set: a job already failed (stale sweep, poll)
+        # or otherwise no longer PENDING must not be run.
+        claimed = await session.execute(
+            update(Job)
+            .where(Job.id == job_id, Job.status == "PENDING")
+            .values(status="RUNNING", queue_position=None)
+        )
+        if not claimed.rowcount:
+            logger.warning("skipping job %s: status is %s, not PENDING", job_id, job.status)
+            await session.rollback()
+            return
         input_payload = job.input_path or ""
         input_type = job.input_type or "text"
         persona: Persona | None = None
@@ -629,4 +667,4 @@ async def _run_inference_only(job_id: str, input_type: str, input_payload: str) 
         job.status = "ERROR"
         job.error_message = f"GPU inference failed after 2 attempt(s): {last_error}"
         job.retry_count = 2
-        await transition(session, job, None)
+        await session.commit()  # stage preserved, as in _fail_job

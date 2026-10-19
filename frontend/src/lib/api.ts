@@ -17,18 +17,47 @@ import type {
 } from "./api-types";
 import { ApiError } from "./errors";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
+
+/** Pull the server's error text out of a failed response.
+ *
+ * FastAPI sends `detail` as a string for HTTPException, but as an array of
+ * `{loc, msg, type}` objects for 422 validation errors — handle both, or those
+ * become invisible to the user. Every non-ok path must go through here: a
+ * hardcoded or empty message throws away a diagnostic the backend took care to
+ * write (e.g. "DEEPSEEK_API_KEY is not configured…", "image > 5MB…").
+ */
+async function detailFrom(response: Response): Promise<string> {
+  try {
+    const body = (await response.json()) as { detail?: unknown };
+    if (typeof body.detail === "string") {
+      return body.detail;
+    }
+    if (Array.isArray(body.detail)) {
+      const messages = body.detail
+        .map((entry) =>
+          entry && typeof entry === "object" && "msg" in entry
+            ? String((entry as { msg: unknown }).msg)
+            : "",
+        )
+        .filter(Boolean);
+      if (messages.length > 0) {
+        return messages.join("; ");
+      }
+    }
+    return "";
+  } catch {
+    return "";
+  }
+}
+
+async function apiErrorFrom(response: Response): Promise<ApiError> {
+  return new ApiError(response.status, await detailFrom(response));
+}
 
 async function parseResponse<T>(response: Response, parser: { parse: (data: unknown) => T }) {
   if (!response.ok) {
-    let message = "";
-    try {
-      const body = (await response.json()) as { detail?: unknown };
-      message = typeof body.detail === "string" ? body.detail : "";
-    } catch {
-      message = "";
-    }
-    throw new ApiError(response.status, message);
+    throw await apiErrorFrom(response);
   }
 
   const json = (await response.json()) as unknown;
@@ -63,7 +92,7 @@ export async function deletePersona(id: string, signal?: AbortSignal): Promise<v
   });
 
   if (!response.ok && response.status !== 204) {
-    throw new ApiError(response.status, "");
+    throw await apiErrorFrom(response);
   }
 }
 
@@ -146,7 +175,7 @@ export async function deleteJob(jobId: string, signal?: AbortSignal): Promise<vo
   });
 
   if (!response.ok && response.status !== 204) {
-    throw new ApiError(response.status, "");
+    throw await apiErrorFrom(response);
   }
 }
 
@@ -177,6 +206,6 @@ export async function suggestPersonaField(
     body: JSON.stringify(body),
     signal,
   });
-  if (!response.ok) throw new ApiError(response.status, "AI suggest failed");
+  if (!response.ok) throw await apiErrorFrom(response);
   return (await response.json()) as AISuggestResponse;
 }
