@@ -8,13 +8,13 @@ Simulates how a persona experiences marketing content, runs the TRIBEv2 brain-en
 
 ## Commands
 
-Backend (Python venv lives at `~/.venvs/brainx`, NOT in the repo):
+Backend (the Python 3.11 venv lives outside the repo; `setup_env.sh` creates it at `$BRAINX_VENV`, default `~/.venvs/brainx`. `$PY` below means that venv's `bin/python`):
 
 ```bash
-~/.venvs/brainx/bin/python -m uvicorn backend.main:app --port 8000   # run server (loads TRIBEv2 at startup, ~1 min)
-~/.venvs/brainx/bin/python -m pytest tests/ -q                       # full backend suite
-~/.venvs/brainx/bin/python -m pytest tests/test_analyze.py -q        # one file
-~/.venvs/brainx/bin/python -m pytest tests/test_watchdog.py::test_watchdog_marks_job_error_on_timeout -q
+$PY -m uvicorn backend.main:app --port 8000   # run server (loads TRIBEv2 at startup, ~1 min)
+$PY -m pytest tests/ -q                       # full backend suite
+$PY -m pytest tests/test_analyze.py -q        # one file
+$PY -m pytest tests/test_watchdog.py::test_watchdog_marks_job_error_on_timeout -q
 ```
 
 Frontend (from `frontend/`):
@@ -26,7 +26,7 @@ npx vitest run       # unit tests (jsdom + msw)
 npx vitest run src/features/run/__tests__/useJobStatus.test.ts   # one file
 ```
 
-Headless E2E (no browser): create persona via `POST /personas`, `POST /content/text`, `POST /analyze`, then poll `GET /jobs/{id}` until DONE/ERROR. **Use one-sentence content** — each simulated screen costs ~2–3 min of CPU inference (TTS → whisperx → model.predict), and multi-screen content can exceed the 3600s job timeout. Keep the Mac awake (`caffeinate -i`) — sleep freezes the server while the job's wall-clock timeout keeps counting.
+Headless E2E (no browser): create persona via `POST /personas`, `POST /content/text`, `POST /analyze`, then poll `GET /jobs/{id}` until DONE/ERROR. **Use one-sentence content** — each simulated screen costs ~2–3 min of CPU inference (TTS → whisperx → model.predict), and multi-screen content can exceed the 3600s job timeout. Keep the machine awake (e.g. `caffeinate -i` on macOS) — sleep freezes the server while the job's wall-clock timeout keeps counting.
 
 ## Architecture
 
@@ -59,7 +59,7 @@ Resilience invariants (do not regress these — they fix the historical "stuck i
 
 ### Third-party TRIBEv2 copy
 
-`tribev2/` is a gitignored clone with local modifications (CPU whisper model choice, silero VAD, whisperx flake retry). Every change there MUST be documented in `patches/tribev2-eventstransforms-cpu-fixes.patch` so `setup_env.sh` reproduces it on a fresh clone. TRIBEv2 shells out to `uvx whisperx`, caching under `model_cache/` (~800MB, gitignored).
+`tribev2/` is a gitignored clone with local modifications (CPU whisper model choice, silero VAD, whisperx flake retry). `setup_env.sh` clones it at a pinned upstream commit and applies `patches/tribev2.patch`. Every change there MUST be captured in that patch (regenerate with `git -C tribev2 diff > patches/tribev2.patch`) and explained in `patches/tribev2-changes.md`. TRIBEv2 shells out to `uvx whisperx`. `model_cache/` (gitignored) holds the TRIBEv2 checkpoint (~0.7GB) plus the feature extractors it pulls (Llama-3.2-3B, w2v-BERT 2.0, V-JEPA 2 for video), so expect 15-25GB.
 
 ### Frontend
 
