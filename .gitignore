@@ -18,3 +18,31 @@ screenshot-*.png
 .playwright-mcp/
 *.tsbuildinfo
 node_modules/
+
+# Environment files (keep the committed template)
+.env.*
+!.env.example
+
+# Local runtime data
+activations/*
+!activations/.gitkeep
+
+# Private launch film (Remotion project kept local only)
+video/
+deliverables/
+
+# OS / editor noise
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# Test and build output
+test-results/
+playwright-report/
+blob-report/
+coverage/
+htmlcov/
+.coverage
+*.log
+frontend/dist/
