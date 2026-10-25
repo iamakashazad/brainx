@@ -1,0 +1,123 @@
+BrainX
+Copyright (c) 2026 Akash Azad
+
+The BrainX source code in this repository is licensed under the MIT License
+(see LICENSE). BrainX depends on third-party models, services, software and
+data that are NOT covered by the MIT License and carry their own terms. The
+most important restriction is summarised first.
+
+===============================================================================
+IMPORTANT: NON-COMMERCIAL USE ONLY WHEN RUN WITH TRIBEv2
+===============================================================================
+
+BrainX's brain-response predictions come from Meta's TRIBEv2 model. TRIBEv2's
+code and weights are licensed under Creative Commons Attribution-NonCommercial
+4.0 International (CC BY-NC 4.0):
+https://creativecommons.org/licenses/by-nc/4.0/
+
+The MIT License on BrainX's own code does not grant any rights to TRIBEv2.
+Running BrainX end to end uses TRIBEv2, so that use is limited to
+non-commercial purposes unless you obtain other terms from Meta.
+
+-------------------------------------------------------------------------------
+1. Meta TRIBEv2 (model code and weights)
+-------------------------------------------------------------------------------
+Source:  https://github.com/facebookresearch/tribev2
+Weights: https://huggingface.co/facebook/tribev2
+License: CC BY-NC 4.0
+
+Not redistributed. setup_env.sh clones TRIBEv2 from GitHub at a pinned commit
+and the weights are downloaded from HuggingFace at runtime.
+
+patches/tribev2.patch contains excerpts of TRIBEv2 source code together with
+BrainX's modifications (CPU WhisperX model choice, silero VAD, subprocess
+retry and environment fixes, a numpy pin relaxation and a TemporalSmoothing
+fix). As a derivative of TRIBEv2, that file is distributed under CC BY-NC 4.0,
+not MIT. The changes are described in patches/tribev2-changes.md.
+
+-------------------------------------------------------------------------------
+2. Models downloaded by TRIBEv2 at runtime
+-------------------------------------------------------------------------------
+TRIBEv2 fetches pretrained feature extractors from HuggingFace on first use.
+None are redistributed here; each is governed by the licence on its model card.
+Depending on the pathway used, these include:
+
+  - meta-llama/Llama-3.2-3B (Llama 3.2 Community License; gated, you must
+    accept Meta's terms on HuggingFace with the account behind HF_TOKEN)
+  - facebook/w2v-bert-2.0
+  - facebook/vjepa2-vitg-fpc64-256 (video pathway)
+  - other encoders referenced by TRIBEv2's configuration
+
+-------------------------------------------------------------------------------
+3. WhisperX (speech transcription)
+-------------------------------------------------------------------------------
+Source:  https://github.com/m-bain/whisperX
+License: BSD 2-Clause
+
+Invoked by TRIBEv2 through `uvx whisperx`; not redistributed. WhisperX
+downloads its own Whisper and VAD models, each under its own licence.
+
+-------------------------------------------------------------------------------
+4. DeepSeek API (persona simulation and recommendations)
+-------------------------------------------------------------------------------
+https://www.deepseek.com/
+Used as a hosted service under DeepSeek's terms of service. Content you
+analyse and persona descriptions are sent to DeepSeek's API.
+
+-------------------------------------------------------------------------------
+5. DeepSeek-VL2 on Replicate (image grounding check)
+-------------------------------------------------------------------------------
+Model:   https://replicate.com/deepseek-ai/deepseek-vl2
+Weights: DeepSeek-VL2, under the DeepSeek Model License
+Used as a hosted service under Replicate's terms. Uploaded images are sent to
+Replicate.
+
+-------------------------------------------------------------------------------
+6. gTTS (text-to-speech)
+-------------------------------------------------------------------------------
+Source:  https://github.com/pndurette/gTTS
+License: MIT
+gTTS calls Google Translate's text-to-speech endpoint, so simulated reading
+text is sent to Google.
+
+-------------------------------------------------------------------------------
+7. fsaverage5 surface and Destrieux atlas (FreeSurfer data, via Nilearn)
+-------------------------------------------------------------------------------
+Files: frontend/public/brain/fsaverage5_pial_bilateral.bin
+       frontend/public/brain/fsaverage5_parcellation.json
+
+These files are modified versions of FreeSurfer data (the fsaverage5 pial
+surfaces and the Destrieux aparc.a2009s parcellation), fetched with Nilearn
+and converted by scripts/bake_fsaverage5.py. The backend also fetches the
+Destrieux atlas through Nilearn at runtime for ROI aggregation.
+
+All or portions of this licensed product (such portions are the "Software")
+have been obtained under license from The General Hospital Corporation "MGH"
+and are subject to the following terms and conditions: see the full FreeSurfer
+Software License Agreement in frontend/public/brain/LICENSE-FreeSurfer.txt.
+
+FreeSurfer: https://surfer.nmr.mgh.harvard.edu/
+Please cite when using these assets:
+  - Fischl B, Sereno MI, Tootell RBH, Dale AM. High-resolution intersubject
+    averaging and a coordinate system for the cortical surface. Human Brain
+    Mapping 8:272-284 (1999).
+  - Destrieux C, Fischl B, Dale A, Halgren E. Automatic parcellation of human
+    cortical gyri and sulci using standard anatomical nomenclature.
+    NeuroImage 53(1):1-15 (2010).
+
+Nilearn (https://nilearn.github.io/, BSD 3-Clause) is used to fetch and load
+these datasets.
+
+-------------------------------------------------------------------------------
+8. Demo data
+-------------------------------------------------------------------------------
+frontend/public/demo/ contains a sample result fixture and activation buffer
+for the in-app demo card (see SWAP_INSTRUCTIONS.md there to replace it with a
+real run). It is illustrative data, not a measurement of any real person.
+
+-------------------------------------------------------------------------------
+9. Other dependencies
+-------------------------------------------------------------------------------
+Python packages (requirements.txt) and npm packages (frontend/package.json)
+are installed from their registries and are not vendored here. Each is
+governed by its own licence.
