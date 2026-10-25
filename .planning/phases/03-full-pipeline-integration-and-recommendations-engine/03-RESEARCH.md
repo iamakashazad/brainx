@@ -140,7 +140,7 @@ CLAUDE.md was not found in the repo root. Follow the established `.planning/` co
 
 **Version verification:**
 ```bash
-grep -E '^(nilearn|numpy|pydantic|httpx|sqlalchemy)' /Users/akashazad/Documents/BrainX/backend/requirements.txt
+grep -E '^(nilearn|numpy|pydantic|httpx|sqlalchemy)' backend/requirements.txt
 ```
 [VERIFIED: backend/requirements.txt read 2026-04-17] nilearn==0.13.1, numpy==2.4.4, pydantic==2.12.5, httpx==0.28.1, sqlalchemy[asyncio]==2.0.40.
 
@@ -780,7 +780,7 @@ async def test_blind_eval_differentiates_opposite_profiles(persona_fixture, sim_
 | Property | Value |
 |----------|-------|
 | Framework | pytest 8.3.5 + pytest-asyncio 0.26.0 |
-| Config file | `/Users/akashazad/Documents/BrainX/pytest.ini` |
+| Config file | `pytest.ini` |
 | Quick run command | `pytest tests/test_roi.py tests/test_continuity.py tests/test_recommendations_blind_eval.py -x` |
 | Full suite command | `pytest -x` (respects the `integration` marker — blind-eval is NOT an `integration` marker because it pytest.skips cleanly without live key) |
 
@@ -896,13 +896,13 @@ All test files use the existing `tests/conftest.py` fixtures (client, persona_fi
 - [nilearn.datasets.fetch_atlas_surf_destrieux — stable docs](https://nilearn.github.io/stable/modules/generated/nilearn.datasets.fetch_atlas_surf_destrieux.html) — D-15 atlas API, return keys (map_left, map_right, labels)
 - [nilearn surface atlas tutorial — plot_surf_atlas](https://nilearn.github.io/stable/auto_examples/01_plotting/plot_surf_atlas.html) — fsaverage5 vertex count (10,242 per hemisphere), label index 0 = "Unknown"
 - [DeepSeek API docs — JSON Output](https://api-docs.deepseek.com/guides/json_mode) — confirmed `response_format: {type: "json_object"}` + Pydantic validation is the correct production path; `json_schema` strict mode is beta/tool-calls-only
-- [backend/services/deepseek_client.py](file:///Users/akashazad/Documents/BrainX/backend/services/deepseek_client.py) read 2026-04-17 — existing retry-once-on-schema-fail pattern (Phase 2 D-04)
-- [backend/services/roi_aggregation.py](file:///Users/akashazad/Documents/BrainX/backend/services/roi_aggregation.py) read 2026-04-17 — current (buggy) `fetch_atlas_destrieux_2009` usage; `ROI_CIRCUIT_MAP` is correct
-- [backend/core/queue.py](file:///Users/akashazad/Documents/BrainX/backend/core/queue.py) read 2026-04-17 — `_process_job`, `transition`, `_run_inference_with_retry`, legacy `_run_inference_only`
-- [backend/models/simulation.py](file:///Users/akashazad/Documents/BrainX/backend/models/simulation.py) read 2026-04-17 — `SimulationLog`, `Screen`, `Event`, `TargetRegion` (frozen schema Phase 3 references)
-- [backend/models/job.py](file:///Users/akashazad/Documents/BrainX/backend/models/job.py) read 2026-04-17 — `StageEnum` extension target, `result_json` JSON column (no migration needed)
-- [tests/conftest.py](file:///Users/akashazad/Documents/BrainX/tests/conftest.py) read 2026-04-17 — existing fixtures (client, persona, content, deepseek_mock_ok)
-- [.planning/research/PITFALLS.md](file:///Users/akashazad/Documents/BrainX/.planning/research/PITFALLS.md) — Pitfall #5 (cortical only), #6 (recs must cite ROI), #7 (subcortical proxies)
+- [backend/services/deepseek_client.py](file://backend/services/deepseek_client.py) read 2026-04-17 — existing retry-once-on-schema-fail pattern (Phase 2 D-04)
+- [backend/services/roi_aggregation.py](file://backend/services/roi_aggregation.py) read 2026-04-17 — current (buggy) `fetch_atlas_destrieux_2009` usage; `ROI_CIRCUIT_MAP` is correct
+- [backend/core/queue.py](file://backend/core/queue.py) read 2026-04-17 — `_process_job`, `transition`, `_run_inference_with_retry`, legacy `_run_inference_only`
+- [backend/models/simulation.py](file://backend/models/simulation.py) read 2026-04-17 — `SimulationLog`, `Screen`, `Event`, `TargetRegion` (frozen schema Phase 3 references)
+- [backend/models/job.py](file://backend/models/job.py) read 2026-04-17 — `StageEnum` extension target, `result_json` JSON column (no migration needed)
+- [tests/conftest.py](file://tests/conftest.py) read 2026-04-17 — existing fixtures (client, persona, content, deepseek_mock_ok)
+- [.planning/research/PITFALLS.md](file://.planning/research/PITFALLS.md) — Pitfall #5 (cortical only), #6 (recs must cite ROI), #7 (subcortical proxies)
 
 ### Secondary (MEDIUM confidence)
 - WebSearch verified with nilearn docs — Destrieux surface atlas has 76 labels per hemisphere, fsaverage5 is 10,242 vertices per hemisphere (multiple independent sources)

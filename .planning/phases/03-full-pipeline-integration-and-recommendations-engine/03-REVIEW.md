@@ -37,7 +37,7 @@ The previous Phase 3 follow-up concerns were addressed:
 
 ### IN-01: Service boundary remains the authoritative recommendation validator
 
-**File:** `/Users/akashazad/Documents/BrainX/backend/services/recommendations.py`
+**File:** `backend/services/recommendations.py`
 **Note:** `Recommendations` Pydantic models still permit arbitrary string `circuit` and `region` values during raw model construction, while production correctness is enforced inside `generate_recommendations()`. This is acceptable with the current architecture because queue/API flows enter through the service, but it should be revisited if new callers start bypassing that boundary.
 
 ---

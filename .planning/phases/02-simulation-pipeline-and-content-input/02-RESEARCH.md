@@ -887,7 +887,7 @@ Framework install: none (pytest + pytest-asyncio already present). Only new dep:
 7. **Phase 2 needs 10 new test files / ~32 new test functions**, all mocking DeepSeek and Replicate via respx. Existing Phase 1 tests must continue to pass unchanged (D-12 backward compatibility).
 
 ### File Created
-`/Users/akashazad/Documents/BrainX/.planning/phases/02-simulation-pipeline-and-content-input/02-RESEARCH.md`
+`.planning/phases/02-simulation-pipeline-and-content-input/02-RESEARCH.md`
 
 ### Confidence Assessment
 | Area | Level | Reason |

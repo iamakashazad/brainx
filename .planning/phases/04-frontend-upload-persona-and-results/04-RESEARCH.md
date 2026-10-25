@@ -662,7 +662,7 @@ This is a greenfield frontend phase — there is no existing frontend runtime st
 
 | Category | Items Found | Action Required |
 |----------|-------------|------------------|
-| Stored data | None — verified by `ls /Users/akashazad/Documents/BrainX/` showing no `frontend/`, `web/`, `client/`, or `app/` directory, and no `package.json` at repo root. SQLite `brainx.db` belongs to the backend and is not touched by this phase. | none |
+| Stored data | None — verified by `ls ` showing no `frontend/`, `web/`, `client/`, or `app/` directory, and no `package.json` at repo root. SQLite `brainx.db` belongs to the backend and is not touched by this phase. | none |
 | Live service config | None — verified by inspecting `backend/main.py` CORS config (already permits `localhost:5173` and `localhost:3000`, so no change needed when the Vite dev server starts). | none |
 | OS-registered state | None — no launch daemons, Task Scheduler entries, pm2 registrations, or systemd units involve the frontend. Backend runs via `uvicorn` invoked manually per `backend/main.py` docstring. | none |
 | Secrets / env vars | The frontend will need `VITE_API_BASE_URL` in `frontend/.env.local` for dev, defaulting to `http://localhost:8000`. No shared secrets cross from backend to frontend. | add `VITE_API_BASE_URL` to `frontend/.env.local` during scaffolding task |

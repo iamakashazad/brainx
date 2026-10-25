@@ -32,17 +32,17 @@ Reviewed at `standard` depth against the scoped Phase 2 files.
 
 ### Medium - VL2 malformed JSON bypasses the required repair retry
 
-- Fixed in [backend/services/vision_providers/replicate.py](/Users/akashazad/Documents/BrainX/backend/services/vision_providers/replicate.py:20) and [backend/services/simulation.py](/Users/akashazad/Documents/BrainX/backend/services/simulation.py:74) by preserving raw provider text and validating it in the simulation layer.
+- Fixed in [backend/services/vision_providers/replicate.py](backend/services/vision_providers/replicate.py:20) and [backend/services/simulation.py](backend/services/simulation.py:74) by preserving raw provider text and validating it in the simulation layer.
 - Result: malformed VL2 JSON now triggers the required `Previous attempt failed validation` repair prompt instead of failing on the first response.
 
 ### Medium - Grounding fail-safe does not catch all provider and file errors
 
-- Fixed in [backend/services/vision_providers/replicate.py](/Users/akashazad/Documents/BrainX/backend/services/vision_providers/replicate.py:39) and [backend/services/grounding.py](/Users/akashazad/Documents/BrainX/backend/services/grounding.py:45) by moving file reads inside the protected provider block and treating provider/file failures as conservative grounding failures.
+- Fixed in [backend/services/vision_providers/replicate.py](backend/services/vision_providers/replicate.py:39) and [backend/services/grounding.py](backend/services/grounding.py:45) by moving file reads inside the protected provider block and treating provider/file failures as conservative grounding failures.
 - Result: missing upload files or provider-side errors now collapse into `HallucinationError([])` rather than surfacing as generic worker failures.
 
 ### Medium - Referential integrity for `persona_id` / `content_id` is not actually enforced in SQLite, so queued jobs can become invalid
 
-- Fixed in [backend/core/database.py](/Users/akashazad/Documents/BrainX/backend/core/database.py:12), [backend/routers/personas.py](/Users/akashazad/Documents/BrainX/backend/routers/personas.py:86), and [backend/core/queue.py](/Users/akashazad/Documents/BrainX/backend/core/queue.py:92) by enabling SQLite foreign keys globally, returning `409 Conflict` on referenced persona deletes, and failing any orphaned Phase 2 jobs explicitly.
+- Fixed in [backend/core/database.py](backend/core/database.py:12), [backend/routers/personas.py](backend/routers/personas.py:86), and [backend/core/queue.py](backend/core/queue.py:92) by enabling SQLite foreign keys globally, returning `409 Conflict` on referenced persona deletes, and failing any orphaned Phase 2 jobs explicitly.
 - Result: local/dev/test SQLite now enforces the same foreign-key expectations as the rest of the stack, and the worker no longer proceeds with missing linked rows.
 
 ## Resolution

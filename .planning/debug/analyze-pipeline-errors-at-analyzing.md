@@ -108,7 +108,7 @@ started: |
       status="ERROR"
       stage=null
       error_message="Simulation service temporarily unavailable. Please retry."
-    All for persona_id=866283e9-... (Akash) and content_id=3ff3a0e2-... (type=text,
+    All for persona_id=866283e9-... (test persona) and content_id=3ff3a0e2-... (type=text,
     "Learn AI by Building Real-World Skills" marketing copy).
   implication: |
     DEFINITIVE ROOT-CAUSE EVIDENCE. The error_message is the verbatim SANITIZED_ERROR
@@ -154,7 +154,7 @@ fix: |
   optional hardening.
 
   Part A (REQUIRED — config):
-    Add valid keys to /Users/akashazad/Documents/BrainX/.env:
+    Add valid keys to .env:
       DEEPSEEK_API_KEY=sk-...            # for text content pathway
       REPLICATE_API_TOKEN=r8_...         # for ui_screens / static image pathway
     Restart uvicorn so Settings() re-reads the .env.
