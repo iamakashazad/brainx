@@ -1,0 +1,172 @@
+diff --git a/pyproject.toml b/pyproject.toml
+index da72895..9a2d4fc 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -15,7 +15,7 @@ dependencies = [
+   "neuralset==0.0.2",
+   "neuraltrain==0.0.2",
+   "torch>=2.5.1,<2.7",
+-  "numpy==2.2.6",
++  "numpy>=2.2.6,<3",
+   "torchvision>=0.20,<0.22",
+   "x_transformers==1.27.20",
+   "einops",
+diff --git a/tribev2/eventstransforms.py b/tribev2/eventstransforms.py
+index 1fd0c69..12b6549 100644
+--- a/tribev2/eventstransforms.py
++++ b/tribev2/eventstransforms.py
+@@ -95,6 +95,7 @@ class ExtractWordsFromAudio(EventsTransform):
+     def _get_transcript_from_audio(wav_filename: Path, language: str) -> pd.DataFrame:
+         import json
+         import os
++        import signal
+         import subprocess
+         import tempfile
+ 
+@@ -105,7 +106,14 @@ class ExtractWordsFromAudio(EventsTransform):
+             raise ValueError(f"Language {language} not supported")
+ 
+         device = "cuda" if torch.cuda.is_available() else "cpu"
+-        compute_type = "float16"
++        # Use a smaller model on CPU for reasonable performance.
++        # large-v3 is too slow for CPU inference (>10 min per short clip).
++        # base model transcribes in seconds and is sufficient for pipeline
++        # smoke tests. MPS is excluded because TRIBEv2 stalls on MPS.
++        if device == "mps":
++            device = "cpu"
++        whisper_model = "large-v3" if device == "cuda" else "base"
++        compute_type = "float16" if device == "cuda" else "int8"
+ 
+         with tempfile.TemporaryDirectory() as output_dir:
+             logger.info("Running whisperx via uvx...")
+@@ -114,7 +122,7 @@ class ExtractWordsFromAudio(EventsTransform):
+                 "whisperx",
+                 str(wav_filename),
+                 "--model",
+-                "large-v3",
++                whisper_model,
+                 "--language",
+                 language_codes[language],
+                 "--device",
+@@ -123,8 +131,15 @@ class ExtractWordsFromAudio(EventsTransform):
+                 compute_type,
+                 "--batch_size",
+                 "16",
+-                "--align_model",
+-                "WAV2VEC2_ASR_LARGE_LV60K_960H" if language == "english" else "",
++                # On CPU, skip the pyannote alignment model (incompatible
++                # with PyTorch 2.6 weights_only=True). The base whisperx
++                # model already outputs word-level timestamps natively.
++                *(["--align_model", "WAV2VEC2_ASR_LARGE_LV60K_960H"] if device == "cuda" and language == "english" else []),
++                # On non-CUDA devices, swap the default pyannote VAD for
++                # silero. Pyannote VAD also hits the PyTorch 2.6
++                # weights_only=True rejection on omegaconf.listconfig.ListConfig;
++                # silero VAD uses a plain torch.jit archive and loads cleanly.
++                *(["--vad_method", "silero"] if device != "cuda" else []),
+                 "--output_dir",
+                 output_dir,
+                 "--output_format",
+@@ -132,9 +147,87 @@ class ExtractWordsFromAudio(EventsTransform):
+             ]
+             cmd = [c for c in cmd if c]  # remove empty args
+             env = {k: v for k, v in os.environ.items() if k != "MPLBACKEND"}
+-            result = subprocess.run(cmd, capture_output=True, text=True, env=env)
+-            if result.returncode != 0:
+-                raise RuntimeError(f"whisperx failed:\n{result.stderr}")
++            # BrainX's tribe_loader sets HOME=model_cache (and XDG_CACHE_HOME) so
++            # torch/HF caches stay inside the workspace. That must NOT leak into
++            # uvx: with HOME=model_cache, uv cannot see its managed interpreters
++            # under ~/.local/share/uv/python and silently falls back to the Xcode
++            # CommandLineTools python3 (3.9.6). whisperx then has to build several
++            # sdists from source, which takes tens of minutes, holds the uv cache
++            # lock, and dies under memory pressure — observed as returncode=-15
++            # with an empty stderr. Restore the real HOME (read from the password
++            # database so the clobbered env cannot fool us) so uv resolves its
++            # managed 3.11 and warm wheel cache. HF_HOME is inherited unchanged,
++            # so whisperx model downloads still land in model_cache.
++            import pwd as _pwd
++
++            env["HOME"] = _pwd.getpwuid(os.getuid()).pw_dir
++            env.pop("XDG_CACHE_HOME", None)
++
++            # uvx whisperx occasionally dies on a cold invocation with an
++            # empty stderr (observed while uv refreshes the tool env after
++            # OS/toolchain updates). Retry before failing the whole pipeline.
++            import time as _time
++
++            # A cold start (uv resolve + wheel download) legitimately takes a
++            # couple of minutes; past this it is a hang, not slow progress.
++            timeout_seconds = int(os.environ.get("BRAINX_WHISPERX_TIMEOUT", "900"))
++
++            result = None
++            for attempt in range(3):
++                started = _time.monotonic()
++                try:
++                    result = subprocess.run(
++                        cmd,
++                        capture_output=True,
++                        text=True,
++                        env=env,
++                        timeout=timeout_seconds,
++                    )
++                except subprocess.TimeoutExpired as exc:
++                    raise RuntimeError(
++                        f"whisperx timed out after {timeout_seconds}s on attempt "
++                        f"{attempt + 1}/3 (no transcript produced). "
++                        f"Command: {' '.join(cmd)}"
++                    ) from exc
++                if result.returncode == 0:
++                    break
++                elapsed = _time.monotonic() - started
++                # A negative returncode means the child was killed by a signal
++                # rather than exiting on its own. That is not the cold-start
++                # flake this retry loop exists for, and retrying it multiplies an
++                # already-expensive failure across three nested retry layers, so
++                # fail fast and let the real reason surface.
++                if result.returncode < 0:
++                    logger.warning(
++                        "whisperx killed by signal on attempt %d (returncode=%s, "
++                        "%.1fs) — not retrying, this is not a cold-start flake",
++                        attempt + 1,
++                        result.returncode,
++                        elapsed,
++                    )
++                    break
++                logger.warning(
++                    "whisperx attempt %d failed (returncode=%s, %.1fs); retrying",
++                    attempt + 1,
++                    result.returncode,
++                    elapsed,
++                )
++                _time.sleep(2)
++            if result is None or result.returncode != 0:
++                code = result.returncode if result else "unknown"
++                signal_note = ""
++                if isinstance(code, int) and code < 0:
++                    try:
++                        signal_note = f" killed by {signal.Signals(-code).name}"
++                    except ValueError:
++                        signal_note = f" killed by signal {-code}"
++                stderr_tail = (result.stderr or "")[-2000:] if result else ""
++                stdout_tail = (result.stdout or "")[-1000:] if result else ""
++                raise RuntimeError(
++                    f"whisperx failed (returncode={code}{signal_note})\n"
++                    f"stderr: {stderr_tail or '(empty)'}\n"
++                    f"stdout: {stdout_tail or '(empty)'}"
++                )
+ 
+             json_path = Path(output_dir) / f"{wav_filename.stem}.json"
+             transcript = json.loads(json_path.read_text())
+diff --git a/tribev2/model.py b/tribev2/model.py
+index d08d170..aee9316 100644
+--- a/tribev2/model.py
++++ b/tribev2/model.py
+@@ -42,7 +42,7 @@ class TemporalSmoothing(BaseModelConfig):
+             kernel = gaussian_kernel_1d(kernel_size=self.kernel_size, sigma=self.sigma)
+             kernel = kernel.repeat(dim, 1, 1)
+             conv.weight.data = kernel
+-            conv.requires_grad = False
++            conv.requires_grad_(False)
+         return conv
+ 
+ 
