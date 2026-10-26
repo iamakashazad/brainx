@@ -19,10 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
--------------------------------------------------------------------------------
-This licence covers the BrainX source code in this repository only. It does
-not cover Meta's TRIBEv2 model, its weights, or the other third-party models,
-services and data BrainX uses, which carry their own terms. In particular,
-TRIBEv2 and its weights are licensed CC BY-NC 4.0 (non-commercial use only).
-See NOTICE for details.
