@@ -5,7 +5,7 @@ uvicorn[standard]==0.34.2
 pydantic==2.12.5
 pydantic-settings==2.8.1
 python-dotenv==1.2.2
-python-multipart==0.0.20
+python-multipart==0.0.31
 sqlalchemy[asyncio]==2.0.40
 aiosqlite==0.21.0
 alembic==1.15.2
