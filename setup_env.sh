@@ -82,6 +82,10 @@ fi
 
 python -m pip install -e "${TRIBEV2_DIR}[plotting]"
 python -m pip install -r "${PROJECT_ROOT}/requirements.txt"
+# moviepy 2.2.1 declares pillow<12 but we need Pillow 13 for security fixes;
+# install the pin without letting it downgrade Pillow (see requirements.txt).
+# pip will print a moviepy/pillow conflict warning above; that is expected.
+python -m pip install --no-deps "moviepy==2.2.1"
 
 python - <<'PY'
 import importlib

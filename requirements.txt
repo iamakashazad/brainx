@@ -12,7 +12,12 @@ alembic==1.15.2
 numpy==2.4.4
 scipy==1.17.1
 nilearn==0.13.1
-moviepy==2.2.1
+# moviepy==2.2.1 is installed by setup_env.sh with --no-deps, not here.
+# moviepy 2.2.1 (latest release) declares pillow<12, but Pillow 13.0.0 is
+# required to fix critical Pillow advisories, so pip cannot resolve both in
+# one requirements file. BrainX/TRIBEv2 only use ImageClip -> concatenate ->
+# write_videofile, which is verified working on Pillow 13. Restore the pin
+# here once a moviepy release allows pillow>=13.
 gTTS==2.5.4
 Pillow==13.0.0
 httpx==0.28.1
